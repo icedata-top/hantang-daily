@@ -26,7 +26,66 @@
 
 ## 数据表设计
 
-todo
+### 维度表
+
+```mysql-sql
+CREATE TABLE IF NOT EXISTS dim_type (
+    type_id INT PRIMARY KEY COMMENT '分区 ID',
+    name VARCHAR(255) NOT NULL COMMENT '分区名称'
+) COMMENT = '分区_维度表';
+
+CREATE TABLE IF NOT EXISTS dim_user (
+    user_id BIGINT PRIMARY KEY COMMENT '用户 ID',
+    name VARCHAR(255) NOT NULL COMMENT '用户名',
+    face VARCHAR(255) COMMENT '用户头像 URL'
+) COMMENT = '用户_维度表';
+```
+### 事实表
+
+(1) 视频静态信息 
+
+```mysql-sql
+CREATE TABLE IF NOT EXISTS video_static (
+    aid BIGINT PRIMARY KEY COMMENT '视频的 AV 号',
+    bvid VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',
+    pubdate INT NOT NULL COMMENT '投稿时间',
+    title VARCHAR(255) NOT NULL COMMENT '标题',
+    description TEXT COMMENT '简介',
+    tag VARCHAR(255) COMMENT '标签',
+    pic VARCHAR(255) COMMENT '封面 URL',
+    type_id INT COMMENT '分区 ID',
+    user_id BIGINT COMMENT 'UP主 ID',
+    KEY `idx_bvid` (bvid),
+    KEY `idx_user_id` (user_id)
+    -- FOREIGN KEY (type_id) REFERENCES type(id) ON DELETE SET NULL,
+    -- FOREIGN KEY (user_mid) REFERENCES user(mid) ON DELETE SET NULL
+) COMMENT = '视频静态信息';
+```
+
+(2) 视频动态数据
+
+这里不存放用户ID，因为用户ID是静态数据。一个视频一旦投稿，其UP主不会改变。
+
+```mysql-sql
+CREATE TABLE IF NOT EXISTS video_dynamic (
+    `record_date` DATE NOT NULL COMMENT '记录日期', 
+    `aid` BIGINT NOT NULL COMMENT '视频的 AV 号',
+    `bvid` VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',
+    `coin` INT NOT NULL COMMENT '硬币',
+    `favorite` INT NOT NULL COMMENT '收藏',
+    `danmaku` INT NOT NULL COMMENT '弹幕',
+    `view` INT NOT NULL COMMENT '播放',
+    `reply` INT NOT NULL COMMENT '评论',
+    `share` INT NOT NULL COMMENT '分享',
+    `like` INT NOT NULL COMMENT '点赞',
+    PRIMARY KEY (`record_date`, `aid`),
+    INDEX `idx_aid` (`aid`),
+    INDEX `idx_bvid` (`bvid`),
+    INDEX `idx_view` (`view`),
+    INDEX `idx_record_date` (`record_date`)
+) COMMENT = '视频动态数据';
+```
+
 
 ## 第三方依赖
 

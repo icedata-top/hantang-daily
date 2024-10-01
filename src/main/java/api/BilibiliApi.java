@@ -131,15 +131,17 @@ public class BilibiliApi {
      * @param pageSize 页面大小，建议50
      * @return HTTP响应
      */
-    public String getSearchResultApi(String keyword, int page, int pageSize) throws IOException {
+    private String getSearchResultApi(String keyword, int page, int pageSize) throws IOException {
         // https://api.bilibili.com/x/web-interface/wbi/search/type?category_id=&search_type=video&ad_resource=5654&__refresh__=true&_extra=&context=&page=1&page_size=42&order=pubdate&pubtime_begin_s=0&pubtime_end_s=0&from_source=&from_spmid=333.337&platform=pc&highlight=1&single_column=0&keyword=%E6%B4%9B%E5%A4%A9%E4%BE%9D&qv_id=tG0mRpB1A0CXdLHy1zTmmwqwIm284e0O&source_tag=3&gaia_vtoken=&dynamic_offset=0&web_location=1430654&w_rid=f43f9e9e3aec7fc9f6cc5726fa4dc02c&wts=1727775241
         String encodeKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
         String urlString2 = String.format(
-                "https://api.bilibili.com/x/web-interface/wbi/search/type?category_id=&search_type=video&ad_resource=5654&__refresh__=true&_extra=&context=&page=%d&page_size=%d&order=pubdate&pubtime_begin_s=0&pubtime_end_s=0&from_source=&from_spmid=333.337&platform=pc&highlight=1&single_column=0&keyword=%s&qv_id=tG0mRpB1A0CXdLHy1zTmmwqwIm284e0O&source_tag=3&gaia_vtoken=&dynamic_offset=0&web_location=1430654&w_rid=f43f9e9e3aec7fc9f6cc5726fa4dc02c&wts=1727775241",
+                "https://api.bilibili.com/x/web-interface/wbi/search/type?category_id=&search_type=video&ad_resource=5654&__refresh__=true&_extra=&context=&page=%d&page_size=%d&order=%s&pubtime_begin_s=0&pubtime_end_s=0&from_source=&from_spmid=333.337&platform=pc&highlight=1&single_column=0&keyword=%s&qv_id=tG0mRpB1A0CXdLHy1zTmmwqwIm284e0O&source_tag=3&gaia_vtoken=&dynamic_offset=0&web_location=1430654&w_rid=f43f9e9e3aec7fc9f6cc5726fa4dc02c&wts=1727775241",
                 page,
                 pageSize,
+                "pubdate",
                 encodeKeyword
                 );
+        System.out.println(urlString2);
         return callApiByUrlString(urlString2);
     }
 
