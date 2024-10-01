@@ -1,0 +1,248 @@
+{
+  "code": 0,
+  "data": [
+    {
+      "attr": 0,
+      "bv_id": "BV1Qs411k7Qv",
+      "bvid": "BV1Qs411k7Qv",
+      "cnt_info": {
+        "coin": 215405,
+        "collect": 246770,
+        "danmaku": 66864,
+        "play": 6365008,
+        "play_switch": 0,
+        "reply": 126132,
+        "share": 38931,
+        "thumb_down": 0,
+        "thumb_up": 207029,
+        "view_text_1": "636.5万",
+        "vt": 0
+      },
+      "coin": {
+        "coin_number": 0,
+        "max_num": 2
+      },
+      "copyright": 1,
+      "cover": "http://i2.hdslb.com/bfs/archive/8b7dfa54e4cb68dc0815bb95cfcba9a3433a9119.jpg",
+      "ctime": 1497423941,
+      "dimension": {
+        "height": 568,
+        "rotate": 0,
+        "width": 1280
+      },
+      "duration": 363,
+      "elec_open": 0,
+      "fav_state": 0,
+      "id": 6009789,
+      "intro": "自制\n【词曲：COP/绘：唯Tu/影：saiqomo/logo：少年莫然、实拍素材：莫雪 冰镇甜豆浆/压制：ZHider】\n世末歌者系列，部分系列曲：《世末积雨云》av1579079 ，《回音》av2711298 ，《hello&amp;bye，days》av3402945\n具体走评论区。",
+      "like_state": 0,
+      "link": "bilibili://video/6009789",
+      "page": 1,
+      "pages": [
+        {
+          "dimension": {
+            "height": 568,
+            "rotate": 0,
+            "width": 1280
+          },
+          "duration": 363,
+          "from": "vupload",
+          "id": 35302832,
+          "metas": [
+            {
+              "quality": 15,
+              "size": 23159
+            },
+            {
+              "quality": 16,
+              "size": 23159
+            },
+            {
+              "quality": 32,
+              "size": 51310
+            },
+            {
+              "quality": 48,
+              "size": 66283
+            },
+            {
+              "quality": 64,
+              "size": 109408
+            },
+            {
+              "quality": 74,
+              "size": 159320
+            },
+            {
+              "quality": 80,
+              "size": 159320
+            },
+            {
+              "quality": 112,
+              "size": 309058
+            },
+            {
+              "quality": 116,
+              "size": 309058
+            },
+            {
+              "quality": 66,
+              "size": 90840
+            }
+          ],
+          "page": 1,
+          "title": ""
+        }
+      ],
+      "pubtime": 1472134541,
+      "rights": {
+        "autoplay": 1,
+        "bp": 0,
+        "download": 0,
+        "elec": 0,
+        "hd5": 0,
+        "movie": 0,
+        "no_background": 0,
+        "no_reprint": 0,
+        "pay": 0,
+        "ugc_pay": 0
+      },
+      "short_link": "https://b23.tv/BV1Qs411k7Qv",
+      "tid": 30,
+      "title": "【乐正绫原创】世末歌者【PV付/COSMOSⅡ】",
+      "type": 2,
+      "upper": {
+        "face": "https://i2.hdslb.com/bfs/face/544541afa73735172abbe9e6a4bd44100899d48d.jpg",
+        "followed": 0,
+        "mid": 396194,
+        "name": "COPY",
+        "vip_due_date": 1757001600000,
+        "vip_pay_type": 1,
+        "vip_statue": 1,
+        "vip_type": 2
+      }
+    },
+    {
+      "attr": 0,
+      "bv_id": "BV1es41197ai",
+      "bvid": "BV1es41197ai",
+      "cnt_info": {
+        "coin": 424311,
+        "collect": 557076,
+        "danmaku": 195771,
+        "play": 14989561,
+        "play_switch": 0,
+        "reply": 134329,
+        "share": 98607,
+        "thumb_down": 0,
+        "thumb_up": 358128,
+        "view_text_1": "1499万",
+        "vt": 0
+      },
+      "coin": {
+        "coin_number": 0,
+        "max_num": 2
+      },
+      "copyright": 1,
+      "cover": "http://i2.hdslb.com/bfs/archive/37901b40efbed68c5bd9fd054b76ede6900fd8bf.jpg",
+      "ctime": 1497425218,
+      "dimension": {
+        "height": 360,
+        "rotate": 0,
+        "width": 640
+      },
+      "duration": 292,
+      "elec_open": 0,
+      "fav_state": 0,
+      "id": 3905462,
+      "intro": "作曲：烏龜Sui | 作詞：邪叫教主 | 字體 文案：St | 吉他：康師傅の海鮮麵 | 打擊樂：司鼓君 | 笛子：O天氣晴朗O | 琵琶：東北餡餃子 | 調校：納蘭尋風 | 混音：小新 Xin-Kun | 人設：酥妃 | 曲繪：骸鴉 酥妃 INxico | PV：墨蘭花語 | 人声本家：西瓜kune av3919827\r\n\r\n在猴年为大家献上以孙悟空为主角的原创歌曲，希望大家在猴年猴开心猴年满意，新年快乐~",
+      "like_state": 0,
+      "link": "bilibili://video/3905462",
+      "page": 1,
+      "pages": [
+        {
+          "dimension": {
+            "height": 360,
+            "rotate": 0,
+            "width": 640
+          },
+          "duration": 292,
+          "from": "vupload",
+          "id": 6319180,
+          "metas": [
+            {
+              "quality": 15,
+              "size": 18629
+            },
+            {
+              "quality": 16,
+              "size": 18629
+            },
+            {
+              "quality": 32,
+              "size": 41274
+            },
+            {
+              "quality": 48,
+              "size": 53319
+            },
+            {
+              "quality": 64,
+              "size": 88008
+            },
+            {
+              "quality": 74,
+              "size": 128158
+            },
+            {
+              "quality": 80,
+              "size": 128158
+            },
+            {
+              "quality": 112,
+              "size": 248608
+            },
+            {
+              "quality": 116,
+              "size": 248608
+            },
+            {
+              "quality": 66,
+              "size": 73073
+            }
+          ],
+          "page": 1,
+          "title": ""
+        }
+      ],
+      "pubtime": 1456070400,
+      "rights": {
+        "autoplay": 1,
+        "bp": 0,
+        "download": 0,
+        "elec": 0,
+        "hd5": 0,
+        "movie": 0,
+        "no_background": 0,
+        "no_reprint": 0,
+        "pay": 0,
+        "ugc_pay": 0
+      },
+      "short_link": "https://b23.tv/BV1es41197ai",
+      "tid": 30,
+      "title": "【2016拜年祭单品】九九八十一【乐正绫 feat.洛天依】",
+      "type": 2,
+      "upper": {
+        "face": "https://i2.hdslb.com/bfs/face/e9be4c1e917ee3e181cb2f8e0e598dea44335522.jpg",
+        "followed": 0,
+        "mid": 890489,
+        "name": "没有龟壳的乌龟",
+        "vip_due_date": 1728489600000,
+        "vip_pay_type": 0,
+        "vip_statue": 1,
+        "vip_type": 2
+      }
+    }
+  ],
+  "message": "success"
+}

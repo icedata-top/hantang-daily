@@ -1,37 +1,30 @@
 # 寒棠Daily
 
-#### 介绍
+## 介绍
+
 每日获取Bilibili虚拟歌手（例：洛天依）等关键词的视频信息。每日（增量）获取新投稿视频，并且遍历全部视频（全量）获取数据。
 
-#### 软件架构
-软件架构说明
+## 功能
 
+本软件由两部分构成，增量获取新视频，和全量获取所有视频的数据。
 
-#### 安装教程
+有操作系统自带的定时功能来触发本程序运行。两部分功能有先后顺序，并且一定程度上错开时间。
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+### 增量获取新视频
 
-#### 使用说明
+通过Bilibili的搜索API，填写参数使其按时间倒序排序，对诸如“洛天依”“中文VOCALOID”关键词进行搜索。搜索到的视频投稿时间超过上次搜索的时间点就截止。
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+搜索结果先保存在内存中，进行去重后写入MySQL视频信息表。
 
-#### 参与贡献
+### 全量获取数据
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+遍历全量视频（预测在30万数量级），多线程并发调用Bilibili API，得到结果。分批次落入MySQL全量信息表中。
 
+## 数据表设计
 
-#### 特技
+todo
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+## 第三方依赖
+
+todo
+
