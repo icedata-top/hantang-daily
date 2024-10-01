@@ -24,6 +24,17 @@
 
 这里的数据是动态数据，例如播放量`view`、收藏量`favorite`等，基本都是整数类型的。每日都有大量数据落表。
 
+## B站API
+
+### 验权
+
+1. 获取实时口令 img_key、sub_key
+1. 打乱重排实时口令获得 mixin_key
+1. 计算签名（即 w_rid）
+1. 向原始请求参数中添加 w_rid、wts 字段
+
+详细文档请参阅 [WBI 签名](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/misc/sign/wbi.md)
+
 ## 数据表设计
 
 ### 维度表
