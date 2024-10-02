@@ -46,6 +46,7 @@ public class BilibiliApi {
      */
     private String callApiByUrlString(String urlString) throws IOException {
         try {
+            long startTime = System.currentTimeMillis();
             HttpURLConnection connection = getHttpURLConnection(urlString);
             int responseCode = connection.getResponseCode();
 
@@ -59,7 +60,8 @@ public class BilibiliApi {
                 }
                 in.close();
                 connection.disconnect();
-                logger.info("Successfully get HTTP response from Bilibili. URL: {}", urlString);
+                long deltaTime = System.currentTimeMillis() - startTime;
+                logger.info("Successfully get HTTP response from Bilibili. Time: {} ms, URL: {}", deltaTime, urlString);
                 return response.toString();
             } else {
                 connection.disconnect();

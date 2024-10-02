@@ -24,6 +24,6 @@ public class Main {
         List<VideoDynamicDO> videoDynamicDOList = bilibiliApi.getVideoInfo(allVideoIdList);
 
         // (5) 全量插入动态数据
-        mysqlDao.insertDynamic(videoDynamicDOList);
+        // mysqlDao.insertDynamic(videoDynamicDOList);
     }
 }
