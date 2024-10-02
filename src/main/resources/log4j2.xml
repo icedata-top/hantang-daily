@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <!-- 定义 Appenders -->
+    <Appenders>
+        <!-- ConsoleAppender：将日志输出到终端 -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n" />
+        </Console>
+
+        <!-- FileAppender：将INFO及更高级别的日志保存到文件 -->
+        <RollingFile name="File" fileName="logs/app.log" filePattern="logs/app-%d{yyyy-MM-dd}.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n" />
+            <Policies>
+                <!-- 规定日志文件按天滚动（每个日志文件生成新日期的文件） -->
+                <TimeBasedTriggeringPolicy />
+            </Policies>
+        </RollingFile>
+    </Appenders>
+
+    <!-- 定义 Loggers -->
+    <Loggers>
+        <!-- Root logger：输出DEBUG及以上级别的日志到终端，INFO及以上级别的日志保存到文件 -->
+        <Root level="DEBUG">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="File" level="INFO"/>
+        </Root>
+    </Loggers>
+</Configuration>

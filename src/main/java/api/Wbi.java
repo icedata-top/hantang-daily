@@ -161,10 +161,7 @@ public class Wbi {
         // 提取url的?后面的部分
         String param = url.contains("?") ? url.substring(url.indexOf("?") + 1) : url;
         String newKey = param + "&wts=" + wts + this.mixinKey;
-        System.out.println(this.mixinKey);
-        System.out.println(newKey);
         String wRid = md5(newKey);
-        System.out.println(wRid);
         return url + "&w_rid=" + wRid + "&wts=" + wts;
 
     }

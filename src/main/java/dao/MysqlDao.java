@@ -1,7 +1,10 @@
 package dao;
 
+import api.BilibiliApi;
 import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -16,6 +19,7 @@ public class MysqlDao {
     private static final String URL_LOCAL;
     private static final String USER_LOCAL;
     private static final String PASSWORD_LOCAL;
+    private static final Logger logger = LogManager.getLogger(MysqlDao.class);
 
     static {
         try {
@@ -50,7 +54,7 @@ public class MysqlDao {
         Class.forName("com.mysql.cj.jdbc.Driver");
 
         connection = DriverManager.getConnection(URL_LOCAL, USER_LOCAL, PASSWORD_LOCAL);
-        System.out.println("成功连接到数据库！");
+        logger.info("Successfully established connection to MySQL via JDBC.");
     }
 
     /**
@@ -67,6 +71,7 @@ public class MysqlDao {
         if (resultSet.next()) {
             count = resultSet.getInt("count");
         }
+        logger.info("Successfully query count of rows from video_static. count: {}", count);
         return count;
     }
 
