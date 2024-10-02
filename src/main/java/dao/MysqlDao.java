@@ -1,11 +1,14 @@
 package dao;
 
+import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
@@ -22,15 +25,16 @@ public class MysqlDao {
             properties.load(input);
 
             // 读取配置
-            URL_LOCAL = properties.getProperty("db.url");
-            USER_LOCAL = properties.getProperty("db.user");
-            PASSWORD_LOCAL = properties.getProperty("db.password");
+            URL_LOCAL = properties.getProperty("db.url_local");
+            USER_LOCAL = properties.getProperty("db.user_local");
+            PASSWORD_LOCAL = properties.getProperty("db.password_local");
 
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
         }
     }
+
     private final Connection connection;
 
     /**
@@ -51,6 +55,7 @@ public class MysqlDao {
 
     /**
      * 获取video_static中视频数量
+     *
      * @return 所有视频AV号列表
      */
     private int getVideoCount() throws SQLException {
@@ -67,6 +72,7 @@ public class MysqlDao {
 
     /**
      * 获取video_static中所有视频AV号列表
+     *
      * @return 所有视频AV号列表
      */
     public List<Long> getAllVideoIdList() throws SQLException {
@@ -99,6 +105,7 @@ public class MysqlDao {
 
     /**
      * 插入video_static
+     *
      * @param videoStaticDOList 视频静态信息列表
      */
     public void insertStatic(List<VideoStaticDO> videoStaticDOList) throws SQLException {
@@ -138,4 +145,45 @@ public class MysqlDao {
         }
     }
 
+    /**
+     * 插入video_dynamic
+     *
+     * @param videoDynamicDOList 视频静态信息列表
+     */
+    public void insertDynamic(List<VideoDynamicDO> videoDynamicDOList) throws SQLException {
+        String sql = "INSERT INTO video_dynamic (record_date, aid, bvid, coin, favorite, danmaku, view, reply, share, `like`) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        String today = dateFormat.format(new Date());
+
+        // 创建PreparedStatement
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (VideoDynamicDO video : videoDynamicDOList) {
+                preparedStatement.setString(1, today);  // record_date 字符串，具体可以根据需求调整
+                preparedStatement.setLong(2, video.aid());
+                preparedStatement.setString(3, video.bvid());
+                preparedStatement.setInt(4, video.coin());
+                preparedStatement.setInt(5, video.favorite());
+                preparedStatement.setInt(6, video.danmaku());
+                preparedStatement.setInt(7, video.view());
+                preparedStatement.setInt(8, video.reply());
+                preparedStatement.setInt(9, video.share());
+                preparedStatement.setInt(10, video.like());
+
+                // 添加到批量中
+                preparedStatement.addBatch();
+                count++;
+
+                // 当批量大小达到设定值时，执行批量插入
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            // 插入剩余的记录
+            preparedStatement.executeBatch();
+        }
+    }
 }

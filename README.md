@@ -16,7 +16,7 @@
 
 搜索结果先保存在内存中，进行去重后写入MySQL视频信息表。
 
-如此获得到的数据称为**静态数据**，例如视频的投稿时间`pubdate`、UP主`mid`、标题`title`等信息。标题可以改变，但是在本程序当前版本的设计中，认为标题等不可改变。
+如此获得到的数据称为**静态数据**，例如视频的投稿时间`pubdate`、UP主`mid`、标题`title`等信息。
 
 ### 全量获取数据（动态数据）
 
@@ -58,11 +58,11 @@ CREATE TABLE IF NOT EXISTS dim_user (
 ```mysql-sql
 CREATE TABLE IF NOT EXISTS video_static (
     aid BIGINT PRIMARY KEY COMMENT '视频的 AV 号',
-    bvid VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',
+    bvid VARCHAR(50) NOT NULL COMMENT '视频的 BV 号',
     pubdate INT NOT NULL COMMENT '投稿时间',
     title VARCHAR(255) NOT NULL COMMENT '标题',
     description TEXT COMMENT '简介',
-    tag VARCHAR(255) COMMENT '标签',
+    tag TEXT COMMENT '标签',
     pic VARCHAR(255) COMMENT '封面 URL',
     type_id INT COMMENT '分区 ID',
     user_id BIGINT COMMENT 'UP主 ID',

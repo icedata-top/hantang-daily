@@ -38,13 +38,10 @@ public class BilibiliApi {
     /**
      * 按URL字符串调用API。考虑到B站的API参数都是带在URL里的，不需要额外写请求体。
      *
-     * @param urlString URL字符串，需要带上参数，但是不需要带WBI验权参数，会在本函数里添加。
+     * @param urlString URL字符串，需要带上参数（含WBI验权参数w_rid和wts）
      * @return HTTP响应字符串
      */
     private String callApiByUrlString(String urlString) throws IOException {
-        System.out.println("原始URL " + urlString);
-        urlString = Wbi.getInstance().addWbiParam(urlString);
-        System.out.println("WBI URL " + urlString);
         try {
             HttpURLConnection connection = getHttpURLConnection(urlString);
             int responseCode = connection.getResponseCode();
@@ -116,7 +113,7 @@ public class BilibiliApi {
                     cntInfo.getIntValue("play"), // view
                     cntInfo.getIntValue("reply"), // reply
                     cntInfo.getIntValue("share"), // share
-                    cntInfo.getIntValue("like"), // like
+                    cntInfo.getIntValue("thumb_up"), // like
                     new UserDO(
                             upper.getLongValue("mid"),
                             upper.getString("name"),
@@ -147,8 +144,8 @@ public class BilibiliApi {
                 page,
                 pageSize
         );
-        System.out.println("官方URL " + "https://api.bilibili.com/x/web-interface/wbi/search/type?__refresh__=true&_extra=&ad_resource=5654&category_id=&context=&dynamic_offset=0&from_source=&from_spmid=333.337&gaia_vtoken=&highlight=1&keyword=%E6%B4%9B%E5%A4%A9%E4%BE%9D&order=click&page=1&page_size=42&platform=pc&pubtime_begin_s=0&pubtime_end_s=0&qv_id=iVHJSCLIWTe9FksiKu8bIfxA6MD53z3P&search_type=video&single_column=0&source_tag=3&web_location=1430654&w_rid=dbcec74cd4e721a8902cf64211dd62a5&wts=1727799448");
-        return callApiByUrlString(urlString2);
+        String urlString = Wbi.getInstance().addWbiParam(urlString2);
+        return callApiByUrlString(urlString);
     }
 
     /**
