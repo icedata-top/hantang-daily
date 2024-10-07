@@ -1,14 +1,16 @@
 package business;
 
 import api.BilibiliApi;
-import dao.MysqlDao;
+import dos.UserDO;
 import dos.VideoDynamicDO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,7 +22,7 @@ import java.util.concurrent.Future;
 public class TodayDynamicDataJob {
     private final List<Long> allVideoIdList;
     private final List<VideoDynamicDO> allVideoDynamicDOList;
-    private static final int GROUP_SIZE = 40;
+    private static final int GROUP_SIZE;
     private static final Logger logger = LogManager.getLogger(TodayDynamicDataJob.class);
 
     public TodayDynamicDataJob(List<Long> allVideoIdList) {
@@ -28,6 +30,20 @@ public class TodayDynamicDataJob {
         this.allVideoDynamicDOList = new ArrayList<>();
     }
 
+    static {
+        try {
+            // 加载配置文件
+            Properties properties = new Properties();
+            FileInputStream input = new FileInputStream("config.properties");
+            properties.load(input);
+
+            // 读取配置
+            GROUP_SIZE = Integer.parseInt(properties.getProperty("dynamic.group_size", "25"));
+        } catch (IOException e) {
+            e.fillInStackTrace();
+            throw new RuntimeException("无法加载数据库配置文件", e);
+        }
+    }
     /**
      * 串行地调用API获取结果
      */
@@ -80,5 +96,12 @@ public class TodayDynamicDataJob {
 
     public List<VideoDynamicDO> getAllVideoDynamicDOList() {
         return allVideoDynamicDOList;
+    }
+
+    /**
+     * 动态信息里面包含了用户信息，从这里提取，以便插入到用户的维度表。
+     */
+    public List<UserDO> getUserDOList() {
+        return allVideoDynamicDOList.stream().map(VideoDynamicDO::userDO).distinct().toList();
     }
 }

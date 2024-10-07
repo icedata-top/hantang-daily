@@ -12,6 +12,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -21,6 +22,29 @@ import org.apache.logging.log4j.Logger;
 
 public class BilibiliApi {
     private static final Logger logger = LogManager.getLogger(BilibiliApi.class);
+
+    private static final String[] USER_AGENTS = {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
+    };
+
+    // 生成随机User-Agent
+    private static String getRandomUserAgent() {
+        Random random = new Random();
+        int index = random.nextInt(USER_AGENTS.length);
+        return USER_AGENTS[index];
+    }
+
+    // 生成随机的DedeUserID (10位整数)
+    private static String getRandomDedeUserID() {
+        Random random = new Random();
+        int dedeUserID = 1000000000 + random.nextInt(900000000); // 生成10位数字
+        return String.valueOf(dedeUserID);
+    }
+
     /**
      * 获取HTTP连接，实际上是准备HTTP请求头的各种参数。
      *
@@ -33,8 +57,14 @@ public class BilibiliApi {
         HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
         connection.setRequestMethod("GET");
         connection.setConnectTimeout(5000);
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-        connection.setRequestProperty("Cookie", "buvid_fp_plain=undefined;DedeUserID=1145141919;");
+
+        // 随机选取User-Agent
+        String userAgent = getRandomUserAgent();
+        // 随机生成DedeUserID
+        String dedeUserID = getRandomDedeUserID();
+
+        connection.setRequestProperty("User-Agent", userAgent);
+        connection.setRequestProperty("Cookie", "buvid_fp_plain=undefined; DedeUserID=" + dedeUserID + ";");
         return connection;
     }
 
@@ -109,7 +139,6 @@ public class BilibiliApi {
             JSONObject cntInfo = dataElem.getJSONObject("cnt_info");
             JSONObject upper = dataElem.getJSONObject("upper");
 
-            // 使用构造函数创建 VideoDynamicDO 对象
             VideoDynamicDO videoDynamicDO = new VideoDynamicDO(
                     dataElem.getLongValue("id"), // aid
                     dataElem.getString("bvid"), // bvid
@@ -174,6 +203,10 @@ public class BilibiliApi {
 
         JSONObject jsonObject = JSON.parseObject(jsonResponse);
         JSONObject data = jsonObject.getJSONObject("data");
+        if (data == null || !data.containsKey("result")) {
+            logger.error("Cannot get search data from Bilibili API. keyword: {}, page: {}, pageSize: {}", keyword, page, pageSize);
+            return videoList;
+        }
         JSONArray result = data.getJSONArray("result");
         // 解析响应体装入videoList
         for (int i = 0; i < result.size(); i++) {

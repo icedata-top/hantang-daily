@@ -1,6 +1,7 @@
 package dao;
 
-import api.BilibiliApi;
+import dos.TypeDO;
+import dos.UserDO;
 import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
 import org.apache.logging.log4j.LogManager;
@@ -25,7 +26,7 @@ public class MysqlDao {
         try {
             // 加载配置文件
             Properties properties = new Properties();
-            FileInputStream input = new FileInputStream("config.properties");
+            FileInputStream input = new FileInputStream("config.secret.properties");
             properties.load(input);
 
             // 读取配置
@@ -109,7 +110,7 @@ public class MysqlDao {
     }
 
     /**
-     * 插入video_static
+     * 插入或更新video_static
      *
      * @param videoStaticDOList 视频静态信息列表
      */
@@ -147,6 +148,7 @@ public class MysqlDao {
 
             // 插入剩余的记录
             preparedStatement.executeBatch();
+            logger.info("Successfully insert into video_static. rows: {}", videoStaticDOList.size());
         }
     }
 
@@ -189,8 +191,72 @@ public class MysqlDao {
 
             // 插入剩余的记录
             preparedStatement.executeBatch();
+            logger.info("Successfully insert into video_dynamic. rows: {}", videoDynamicDOList.size());
         }
     }
 
+    /**
+     * 插入或更新dim_user
+     */
+    public void insertUserDim(List<UserDO> userDOList) throws SQLException {
+        String sql = "INSERT INTO dim_user (user_id, name, face) " +
+                "VALUES (?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE name = VALUES(name), face = VALUES(face)";
 
+        // 创建PreparedStatement
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (UserDO user : userDOList) {
+                preparedStatement.setLong(1, user.mid());   // user_id
+                preparedStatement.setString(2, user.name()); // name
+                preparedStatement.setString(3, user.face()); // face (可能为null)
+
+                // 添加到批量中
+                preparedStatement.addBatch();
+                count++;
+
+                // 当批量大小达到设定值时，执行批量插入
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            // 插入剩余的记录
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into dim_user. rows: {}", userDOList.size());
+        }
+    }
+
+    /**
+     * 插入或更新dim_type
+     */
+    public void insertTypeDim(List<TypeDO> typeDOList) throws SQLException {
+        String sql = "INSERT INTO dim_type (type_id, name) " +
+                "VALUES (?, ?) " +
+                "ON DUPLICATE KEY UPDATE name = VALUES(name)";
+
+        // 创建PreparedStatement
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (TypeDO type : typeDOList) {
+                preparedStatement.setInt(1, type.typeId());  // type_id
+                preparedStatement.setString(2, type.typeName()); // name
+
+                // 添加到批量中
+                preparedStatement.addBatch();
+                count++;
+
+                // 当批量大小达到设定值时，执行批量插入
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            // 插入剩余的记录
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into dim_type. rows: {}", typeDOList.size());
+        }
+    }
 }
