@@ -1,4 +1,6 @@
 import api.BilibiliApi;
+import business.TodayDynamicDataJob;
+import business.TodayStaticDataJob;
 import dao.MysqlDao;
 import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
@@ -10,8 +12,9 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws IOException, SQLException, ClassNotFoundException {
         // (1) 增量获取视频静态信息
-        BilibiliApi bilibiliApi = new BilibiliApi();
-        List<VideoStaticDO> videoStaticDOList = bilibiliApi.getSearchResult("洛天依", 1, 50);
+        TodayStaticDataJob todayStaticDataJob = new TodayStaticDataJob();
+        todayStaticDataJob.getData();
+        List<VideoStaticDO> videoStaticDOList = todayStaticDataJob.getAllVideoStaticDOList();
 
         // (2) 视频静态信息落库
         MysqlDao mysqlDao = new MysqlDao();
@@ -21,9 +24,11 @@ public class Main {
         List<Long> allVideoIdList = mysqlDao.getAllVideoIdList();
 
         // (4) 全量获取动态数据
-        List<VideoDynamicDO> videoDynamicDOList = bilibiliApi.getVideoInfo(allVideoIdList);
+        TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
+        todayDynamicDataJob.getData();
+        List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
 
         // (5) 全量插入动态数据
-        // mysqlDao.insertDynamic(videoDynamicDOList);
+        mysqlDao.insertDynamic(videoDynamicDOList);
     }
 }

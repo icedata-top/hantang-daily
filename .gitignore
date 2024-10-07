@@ -1,5 +1,5 @@
 # MySQL DB properties
-config.properties
+config.secret.properties
 
 # Build and Release Folders
 bin-debug/

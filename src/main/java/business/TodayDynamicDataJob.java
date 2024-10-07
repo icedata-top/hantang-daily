@@ -1,7 +1,10 @@
 package business;
 
 import api.BilibiliApi;
+import dao.MysqlDao;
 import dos.VideoDynamicDO;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,7 +20,8 @@ import java.util.concurrent.Future;
 public class TodayDynamicDataJob {
     private final List<Long> allVideoIdList;
     private final List<VideoDynamicDO> allVideoDynamicDOList;
-    private static final int GROUP_SIZE = 10;
+    private static final int GROUP_SIZE = 40;
+    private static final Logger logger = LogManager.getLogger(TodayDynamicDataJob.class);
 
     public TodayDynamicDataJob(List<Long> allVideoIdList) {
         this.allVideoIdList = allVideoIdList;
@@ -54,7 +58,7 @@ public class TodayDynamicDataJob {
             int start = groupIndex * GROUP_SIZE;
             int end = Math.min(start + GROUP_SIZE, allVideoIdList.size());
             List<Long> sublist = allVideoIdList.subList(start, end);
-            System.out.println("发起线程 " + start + "~" + end);
+            logger.debug("Start process for getting dynamic data from {} to {}", start, end);
             // 提交任务到线程池
             futures.add(executorService.submit(() -> bilibiliApi.getVideoInfo(sublist)));
         }
@@ -63,13 +67,13 @@ public class TodayDynamicDataJob {
         for (Future<List<VideoDynamicDO>> future : futures) {
             try {
                 allVideoDynamicDOList.addAll(future.get());
-                System.out.println("线程全部执行完毕");
             } catch (InterruptedException | ExecutionException e) {
                 // 处理异常
                 System.err.println("Error occurred while fetching video info: " + e.getMessage());
             }
         }
 
+        logger.info("Successfully finish all processes for getting dynamic data. Count of processes: {}", futures.size());
         // 关闭线程池
         executorService.shutdown();
     }

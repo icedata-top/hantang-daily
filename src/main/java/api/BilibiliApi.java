@@ -146,7 +146,7 @@ public class BilibiliApi {
         String urlString2 = String.format(
                 "https://api.bilibili.com/x/web-interface/wbi/search/type?__refresh__=true&_extra=&ad_resource=5654&category_id=&context=&dynamic_offset=0&from_source=&from_spmid=333.337&gaia_vtoken=&highlight=1&keyword=%s&order=%s&page=%d&page_size=%d&platform=pc&pubtime_begin_s=0&pubtime_end_s=0&qv_id=iVHJSCLIWTe9FksiKu8bIfxA6MD53z3P&search_type=video&single_column=0&source_tag=3&web_location=1430654",
                 encodeKeyword,
-                "click",
+                "pubdate",
                 page,
                 pageSize
         );
