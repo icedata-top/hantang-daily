@@ -28,16 +28,18 @@
 
 ### 验权
 
-1. 获取实时口令 img_key、sub_key
-1. 打乱重排实时口令获得 mixin_key
-1. 计算签名（即 w_rid）
-1. 向原始请求参数中添加 w_rid、wts 字段
+1. 获取实时口令 `img_key`、`sub_key`
+1. 打乱重排实时口令获得 `mixin_key`
+1. 计算签名（即 `w_rid`）
+1. 向原始请求参数中添加 `w_rid`、`wts` 字段
 
 详细文档请参阅 [WBI 签名](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/misc/sign/wbi.md)
 
 ## 数据表设计
 
 ### 维度表
+
+维度表包含分区信息表和用户信息表。
 
 ```mysql-sql
 CREATE TABLE IF NOT EXISTS dim_type (
@@ -73,6 +75,8 @@ CREATE TABLE IF NOT EXISTS video_static (
 ) COMMENT = '视频静态信息';
 ```
 
+这里的外键被注释掉，因为并不需要事实上的外键，只需要逻辑上的外键。我们不对外键进行严格检查。
+
 (2) 视频动态数据
 
 这里不存放用户ID，因为用户ID是静态数据。一个视频一旦投稿，其UP主不会改变。
@@ -98,7 +102,91 @@ CREATE TABLE IF NOT EXISTS video_dynamic (
 ```
 
 
-## 第三方依赖
 
-todo
+## 环境
+
+### Java
+
+本项目使用JDK 21版本进行编写、编译、打包。故而推荐使用JRE 21环境运行。具体地，在服务器和景育的开发环境中，使用`corrette-21.0.4`版本。
+
+```txt
+openjdk version "21.0.4" 2024-07-16 LTS
+OpenJDK Runtime Environment Corretto-21.0.4.7.1 (build 21.0.4+7-LTS)
+OpenJDK 64-Bit Server VM Corretto-21.0.4.7.1 (build 21.0.4+7-LTS, mixed mode, sharing)
+```
+
+### MySQL
+
+本项目使用MySQL 8.0，创建的数据库名为`hantang`。MySQL具体如下
+```txt
+Ver 8.0.31 for Win64 on x86_64 (MySQL Community Server - GPL)
+```
+
+## 配置
+
+### 配置项
+
+本项目有两个配置项，分别是`config.properties`和`config.secret.properties`。
+前者保存了诸如发起请求时的`static.page_size`等信息，推荐设置如下（关键词根据需求调整）：
+```properties
+# today static data job
+static.time_range = 86400
+static.page_size = 50
+static.keywords = 洛天依,言和,乐正绫,乐正龙牙,徵羽摩柯,墨清弦,星尘,海伊,赤羽,诗岸,苍穹,永夜,心华,中文VOCALOID
+
+# today dynamic data job
+dynamic.group_size = 50
+```
+
+后者则是秘密信息，如数据库连接的账号、密码等。模板如下：
+```properties
+db.url_local=jdbc:mysql://${your domain}:3306/hantang
+db.user_local=${your user account}
+db.password_local=${your user password}
+```
+
+上述两个配置文件应当放置在运行Java程序的工作目录中。
+
+### 日志
+本项目的日志使用`Log4j2`依赖，默认生成在`./logs`目录下。不需要手动创建该目录，因为会自动创建。
+
+## 编译与启动
+
+在确保Maven依赖、JDK版本等信息之后，可以编译或启动本项目。
+
+### 在IntelliJ IDEA中Run或Debug
+
+直接在`./src/main/java/Main`的函数`Main`处Run或Debug。
+
+### 典型编译打包
+
+在IntelliJ IDEA的`Project Structure`中设置`Artifacts`，
+添加`JAR`选择`From modules with dependencie`，入口选择`./src/main/java/Main`的函数`Main`。
+建议选择将依赖全部打包进JAR中，可以得到**一个**输出文件，重命名为`app.jar`。便可以按照下文方法进行典型启动。
+
+### 典型启动
+
+(1) 确保在MySQL数据库中创建好了前文所说的四张数据表。
+
+(2) 典型的文件目录如下：
+
+```
+./app.jar
+./config.properties
+./config.secret.properties 
+./logs
+    ./logs/app.log
+```
+
+(3) 可以考虑如下Shell指令启动。如果没有配置默认的java，需要指明java路径。
+```bash
+java -jar ./app.jar
+```
+
+(4) 默认的启动参数为`full`，即先获取近1日投稿的视频静态信息（通过搜索），再获取全量的视频动态数据。
+如果只需要静态信息或只需要动态数据，可以选择启动参数`static`或`dynamic`。例如
+```bash
+java -jar ./app.jar static
+```
+
 
