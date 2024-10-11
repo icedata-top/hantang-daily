@@ -45,7 +45,7 @@ public class MysqlDao {
     /**
      * 写表时分批的大小
      */
-    private static final int INSERT_SIZE = 2000;
+    private static final int INSERT_SIZE = 4000;
     /**
      * 读表时分批的大小
      */

@@ -39,7 +39,7 @@
 
 ### 维度表
 
-维度表包含分区信息表和用户信息表。
+由数据源产生的维度表包含**分区信息表**和**用户信息表**。
 
 ```mysql-sql
 CREATE TABLE IF NOT EXISTS dim_type (
@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS dim_user (
     face VARCHAR(255) COMMENT '用户头像 URL'
 ) COMMENT = '用户_维度表';
 ```
+
+另手动创建虚拟歌手维度表，该表仅手动维护。
+```mysql-sql
+CREATE TABLE IF NOT EXISTS dim_vocal (
+    vocal_id INT PRIMARY KEY COMMENT '虚拟歌手 ID',
+    name VARCHAR(255) NOT NULL COMMENT '虚拟歌手名称',
+    vocal_group VARCHAR(255) NOT NULL COMMENT '虚拟歌手组团'
+) COMMENT = '虚拟歌手_维度表';
+```
+
 ### 事实表
 
 (1) 视频静态信息 
@@ -101,6 +111,41 @@ CREATE TABLE IF NOT EXISTS video_dynamic (
 ) COMMENT = '视频动态数据';
 ```
 
+### OLAP表
+
+以上的维度表和事实表为底表，但是每次查询时，并不是总是得经由底表，这样会导致查询缓慢。因此，需要适当地对数据进行聚合，得到OLAP表（相当于二级结论）。
+
+(1) 歌曲与虚拟歌手的关系表
+
+多对多映射关系，因为1位虚拟歌手（如洛天依）可以唱多首歌，并且1首歌（如《普通DISCO》）可以被多位虚拟歌手演唱。
+
+利用此表，可以查询某个歌手/组团有哪些作品。
+
+```mysql-sql
+CREATE TABLE IF NOT EXISTS olap_rel_video_vocal (
+    aid BIGINT COMMENT '视频的 AV 号',
+    `vocal_id` INT NOT NULL COMMENT '虚拟歌手 ID',
+    PRIMARY KEY (aid, vocal_id)
+) COMMENT = '歌曲与虚拟歌手的关系';
+```
+
+(2) 三个维度的每日汇总信息
+
+三个维度指的是：虚拟歌手、组团、总计。
+这里的汇总信息并不是“当天”的，而是“截止当天”的。所以要算出当天的数据，需要再次进行差分。
+
+例如，使用筛选条件`WHERE d = '2024-10-11' AND cube_id = 1 AND dimens = '洛天依'`，查询到的投稿数指从有记录以来截止2024年10月11日的洛天依的投稿数，并非2024年10月11日当天洛天依的投稿数。
+
+```mysql-sql
+CREATE TABLE IF NOT EXISTS olap_aggre (
+    `d` DATE NOT NULL COMMENT '日期',
+    `cube_id` INT NOT NULL COMMENT '立方体 ID 1虚拟歌手 2组团 3总计',
+    `dimens` VARCHAR(255) NOT NULL COMMENT '维度',
+    `cnt` INT NOT NULL COMMENT '累计投稿数',
+    `view` BIGINT NOT NULL COMMENT '累计播放',
+    `favorite` BIGINT NOT NULL COMMENT '累计收藏'
+) COMMENT = '每日汇总信息';
+```
 
 
 ## 环境
