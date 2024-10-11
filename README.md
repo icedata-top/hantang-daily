@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS dim_user (
 ```mysql-sql
 CREATE TABLE IF NOT EXISTS dim_vocal (
     vocal_id INT PRIMARY KEY COMMENT '虚拟歌手 ID',
-    name VARCHAR(255) NOT NULL COMMENT '虚拟歌手名称',
-    vocal_group VARCHAR(255) NOT NULL COMMENT '虚拟歌手组团'
+    `name` VARCHAR(255) NOT NULL COMMENT '虚拟歌手名称',
+    `group` VARCHAR(255) NOT NULL COMMENT '虚拟歌手组团'
 ) COMMENT = '虚拟歌手_维度表';
 ```
 
