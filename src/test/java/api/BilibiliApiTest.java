@@ -7,7 +7,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
 
-public class Test {
+public class BilibiliApiTest {
     // 示例调用
     public static void main(String[] args) throws IOException, SQLException, ClassNotFoundException {
         BilibiliApi bilibiliApi = new BilibiliApi();
