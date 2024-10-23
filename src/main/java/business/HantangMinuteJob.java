@@ -44,7 +44,7 @@ public class HantangMinuteJob {
     }
 
     /**
-     * 获取数据的线程。aidTaskToExcQueue 的消费者，recordToSaveQueue 的生产者
+     * 获取数据的线程。toGetDataQueue 的消费者，toInsertQueue 的生产者
      */
     static class GetDataThread extends Thread {
         private static final Logger logger = LogManager.getLogger(GetDataThread.class);
@@ -81,7 +81,7 @@ public class HantangMinuteJob {
     }
 
     /**
-     * 插入数据的线程。aidTaskToExcQueue 的消费者，recordToSaveQueue 的生产者
+     * 插入数据的线程。toInsertQueue 的消费者
      */
     static class InsertThread extends Thread {
         private static final Logger logger = LogManager.getLogger(GetDataThread.class);
