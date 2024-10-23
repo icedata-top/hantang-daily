@@ -4,6 +4,7 @@ import dos.TypeDO;
 import dos.UserDO;
 import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
+import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -157,18 +158,22 @@ public class MysqlDao {
      *
      * @param videoDynamicDOList 视频静态信息列表
      */
-    public void insertDynamic(List<VideoDynamicDO> videoDynamicDOList) throws SQLException {
-        String sql = "INSERT INTO video_dynamic (record_date, aid, bvid, coin, favorite, danmaku, view, reply, share, `like`) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    public void insertDynamic(List<VideoDynamicDO> videoDynamicDOList, DynamicInsertTableEnum tableEnum) throws SQLException {
+        String sql = String.format("INSERT INTO %s (%s, aid, bvid, coin, favorite, danmaku, view, reply, share, `like`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", tableEnum.getTable(), tableEnum.getTimeColumn());
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         String today = dateFormat.format(new Date());
+        int now = (int) (System.currentTimeMillis() / 1000L);
 
         // 创建PreparedStatement
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             int count = 0;
 
             for (VideoDynamicDO video : videoDynamicDOList) {
-                preparedStatement.setString(1, today);  // record_date 字符串，具体可以根据需求调整
+                if (DynamicInsertTableEnum.DAILY.equals(tableEnum)) {
+                    preparedStatement.setString(1, today);
+                } else if (DynamicInsertTableEnum.MINUTE.equals(tableEnum)) {
+                    preparedStatement.setInt(1, now);
+                }
                 preparedStatement.setLong(2, video.aid());
                 preparedStatement.setString(3, video.bvid());
                 preparedStatement.setInt(4, video.coin());

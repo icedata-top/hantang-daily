@@ -3,6 +3,7 @@ import business.TodayStaticDataJob;
 import dao.MysqlDao;
 import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
+import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -68,7 +69,7 @@ public class Main {
             List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
 
             // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList);
+            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
 
             // (6) 分区信息
             mysqlDao.insertUserDim(todayDynamicDataJob.getUserDOList());
@@ -102,7 +103,7 @@ public class Main {
             List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
 
             // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList);
+            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
 
             // (6) 插入用户和分区信息
             mysqlDao.insertTypeDim(todayStaticDataJob.getTypeDOList());
