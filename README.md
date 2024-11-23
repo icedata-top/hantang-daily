@@ -46,7 +46,17 @@
 
 ### 优先度变更
 
-暂未设计
+#### 1. 用户手动设置的优先度
+
+在另一个项目`寒棠 web`当中，允许用户将某个视频设置为观测对象，这种情况下，将视频的优先度设置为`1`。
+
+#### 2. 临近殿堂传说
+
+尚在设计中。
+
+#### 3. 常驻每小时监测
+
+所有的传说曲都常驻每小时监测。
 
 ### 双“生产者-消费者”模型
 
@@ -103,17 +113,20 @@ CREATE TABLE IF NOT EXISTS dim_vocal (
 
 ```mysql-sql
 CREATE TABLE IF NOT EXISTS video_static (
-    aid BIGINT PRIMARY KEY COMMENT '视频的 AV 号',
-    bvid VARCHAR(50) NOT NULL COMMENT '视频的 BV 号',
-    pubdate INT NOT NULL COMMENT '投稿时间',
-    title VARCHAR(255) NOT NULL COMMENT '标题',
-    description TEXT COMMENT '简介',
-    tag TEXT COMMENT '标签',
-    pic VARCHAR(255) COMMENT '封面 URL',
-    type_id INT COMMENT '分区 ID',
-    user_id BIGINT COMMENT 'UP主 ID',
+    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
+    `bvid` varchar(50) NOT NULL COMMENT '视频的 BV 号',
+    `pubdate` int NOT NULL COMMENT '投稿时间',
+    `title` varchar(255) NOT NULL COMMENT '标题',
+    `description` text COMMENT '简介',
+    `tag` text COMMENT '标签',
+    `pic` varchar(255) DEFAULT NULL COMMENT '封面 URL',
+    `type_id` int DEFAULT NULL COMMENT '分区 ID',
+    `user_id` bigint DEFAULT NULL COMMENT 'UP主 ID',
+    `priority` int DEFAULT NULL COMMENT '优先级，获取数据的时间间隔（单位：分钟）',
+    PRIMARY KEY (`aid`),
     KEY `idx_bvid` (bvid),
-    KEY `idx_user_id` (user_id)
+    KEY `idx_user_id` (user_id),
+    KEY `idx_priority` (`priority`)
     -- FOREIGN KEY (type_id) REFERENCES type(id) ON DELETE SET NULL,
     -- FOREIGN KEY (user_mid) REFERENCES user(mid) ON DELETE SET NULL
 ) COMMENT = '视频静态信息';
@@ -123,7 +136,7 @@ CREATE TABLE IF NOT EXISTS video_static (
 
 (2) 视频动态数据
 
-这里不存放用户ID，因为用户ID是静态数据。一个视频一旦投稿，其UP主不会改变。
+这里不存放用户ID等是静态数据。一个视频一旦投稿，其UP主不会改变。
 
 该表由寒棠 Daily 每天写入。
 
@@ -146,6 +159,34 @@ CREATE TABLE IF NOT EXISTS video_dynamic (
     INDEX `idx_record_date` (`record_date`)
 ) COMMENT = '视频动态数据';
 ```
+
+(3) 视频分钟数据
+
+和视频动态数据的表格区别在于，这里的第一个字段是记录的 UNIX 时间戳，而不是日期。
+
+每一个视频每天在视频动态数据表里只有一条记录，在视频逐分钟数据里，最快每分钟就有一条记录。
+
+这个表设计的索引 `idx_aid_view` (`aid`, `view`) 是为了更快地查询给定视频在何时达成殿堂/传说的。
+
+```mysql-sql
+CREATE TABLE `video_minute` (
+    `time` int NOT NULL COMMENT '记录时间戳',
+    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
+    `bvid` varchar(255) NOT NULL COMMENT '视频的 BV 号',
+    `coin` int NOT NULL COMMENT '硬币',
+    `favorite` int NOT NULL COMMENT '收藏',
+    `danmaku` int NOT NULL COMMENT '弹幕',
+    `view` int NOT NULL COMMENT '播放',
+    `reply` int NOT NULL COMMENT '评论',
+    `share` int NOT NULL COMMENT '分享',
+    `like` int NOT NULL COMMENT '点赞',
+    PRIMARY KEY (`time`, `aid`),
+    KEY `idx_aid` (`aid`),
+    KEY `idx_bvid` (`bvid`),
+    KEY `idx_aid_view` (`aid`, `view`)
+) COMMENT = '视频逐分钟数据'
+```
+
 
 ### OLAP表
 

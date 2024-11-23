@@ -19,7 +19,6 @@ public class AnalyzeVocalJob {
         return lower.replace("星尘minus", "minus");
     }
 
-
     /**
      * 视频包含歌手。如果包含，添加歌手信息到list中。如果不包含，则无行为。
      * @param list 歌手列表

@@ -264,4 +264,29 @@ public class MysqlDao {
             logger.info("Successfully insert into dim_type. rows: {}", typeDOList.size());
         }
     }
+
+    /**
+     * 获取当前正在观测的视频列表
+     *
+     * @param priority 优先度
+     * @return 视频AV号列表
+     */
+    public List<Long> getObservingVideoList(int priority) throws SQLException {
+        String sql = "SELECT aid FROM video_static WHERE priority = ?;";
+        // 创建PreparedStatement
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setInt(1, priority);  // priority 优先度
+
+            // 执行查询
+            ResultSet resultSet = preparedStatement.executeQuery();
+            List<Long> observingVideoList = new ArrayList<>();
+            while (resultSet.next()) {
+                observingVideoList.add(resultSet.getLong("aid"));
+            }
+
+            // 关闭ResultSet和PreparedStatement
+            resultSet.close();
+            return observingVideoList;
+        }
+    }
 }
