@@ -1,3 +1,4 @@
+import business.HantangMinuteJob;
 import business.TodayDynamicDataJob;
 import business.TodayStaticDataJob;
 import dao.MysqlDao;
@@ -27,6 +28,12 @@ public class Main {
             normalStaticTasks();
         } else if ("dynamic".equalsIgnoreCase(command)) {
             normalDynamicTask();
+        } else if ("minute".equalsIgnoreCase(command)) {
+            try {
+                HantangMinuteJob.main(args);
+            } catch (SQLException | IOException | ClassNotFoundException e) {
+                logger.error("Error happened when execute Hantang Minute Job. exception: .", e);
+            }
         }
         long deltaTime = System.currentTimeMillis() - startTime;
         logger.info("Successfully FINISH main process. Time: {} ms. command: {}", deltaTime, command);
