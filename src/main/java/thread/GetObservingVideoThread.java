@@ -6,6 +6,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 
@@ -15,6 +16,7 @@ import java.util.concurrent.PriorityBlockingQueue;
 public class GetObservingVideoThread extends Thread {
     private static final Logger logger = LogManager.getLogger(GetObservingVideoThread.class);
     final int PRIORITY = 1;
+    final int[] PRIORITY_ARRAY = {1, 15, 60};
     final PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue;
     final MysqlDao mysqlDao; // 这里的dao对象是入参传进来的，因为GetVideoListThread不是多线程的，是单线程的。
 
@@ -25,13 +27,21 @@ public class GetObservingVideoThread extends Thread {
 
     @Override
     public void run() {
+        LocalDateTime localDateTime = LocalDateTime.now();
+        int minute = localDateTime.getMinute();
         try {
-            List<Long> observingVideoList = mysqlDao.getObservingVideoList(PRIORITY);
-            for (Long aid : observingVideoList) {
-                if (aid == null) {
+            // 在整15分钟的时候运行优先级为15的任务，以此类推。
+            for (int priority : PRIORITY_ARRAY) {
+                if (minute % priority != 0) {
                     continue;
                 }
-                toGetDataQueue.add(new VideoWithPriorityDO(aid, PRIORITY));
+                List<Long> observingVideoList = mysqlDao.getObservingVideoList(PRIORITY);
+                for (Long aid : observingVideoList) {
+                    if (aid == null) {
+                        continue;
+                    }
+                    toGetDataQueue.add(new VideoWithPriorityDO(aid, PRIORITY));
+                }
             }
         } catch (SQLException e) {
             logger.error(e);

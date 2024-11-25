@@ -56,7 +56,7 @@
 
 #### 3. 常驻每小时监测
 
-所有的传说曲都常驻每小时监测。
+所有的传说曲都常驻每小时监测。所有 500 万播放量以上的暂时也每分钟监测。
 
 ### 双“生产者-消费者”模型
 
@@ -184,7 +184,7 @@ CREATE TABLE `video_minute` (
     KEY `idx_aid` (`aid`),
     KEY `idx_bvid` (`bvid`),
     KEY `idx_aid_view` (`aid`, `view`)
-) COMMENT = '视频逐分钟数据'
+) COMMENT = '视频逐分钟数据';
 ```
 
 
