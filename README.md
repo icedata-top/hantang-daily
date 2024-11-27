@@ -126,7 +126,8 @@ CREATE TABLE IF NOT EXISTS video_static (
     PRIMARY KEY (`aid`),
     KEY `idx_bvid` (bvid),
     KEY `idx_user_id` (user_id),
-    KEY `idx_priority` (`priority`)
+    KEY `idx_priority` (`priority`),
+    KEY `idx_pubdate` (`pubdate`)
     -- FOREIGN KEY (type_id) REFERENCES type(id) ON DELETE SET NULL,
     -- FOREIGN KEY (user_mid) REFERENCES user(mid) ON DELETE SET NULL
 ) COMMENT = '视频静态信息';
@@ -199,10 +200,11 @@ CREATE TABLE `video_minute` (
 利用此表，可以查询某个歌手/组团有哪些作品。
 
 ```mysql-sql
-CREATE TABLE IF NOT EXISTS olap_rel_video_vocal (
-    aid BIGINT COMMENT '视频的 AV 号',
-    `vocal_id` INT NOT NULL COMMENT '虚拟歌手 ID',
-    PRIMARY KEY (aid, vocal_id)
+CREATE TABLE `hantang`.`olap_rel_video_vocal` (
+    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
+    `vocal_id` int NOT NULL COMMENT '虚拟歌手 ID',
+    PRIMARY KEY (`aid`, `vocal_id`),
+    KEY `idx_vocal_id` (`vocal_id`)
 ) COMMENT = '歌曲与虚拟歌手的关系';
 ```
 

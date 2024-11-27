@@ -1,10 +1,16 @@
 package business;
 
 import com.mysql.cj.util.StringUtils;
+import dao.MysqlDao;
 import dos.VideoStaticDO;
 import dos.VideoVocalDO;
 import enums.VocalEnum;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -14,6 +20,8 @@ import java.util.function.Function;
  * 分析虚拟歌手
  */
 public class AnalyzeVocalJob {
+    private static final Logger logger = LogManager.getLogger(AnalyzeVocalJob.class);
+
     private String preHandle(String string) {
         String lower = string.toLowerCase();
         return lower.replace("星尘minus", "minus");
@@ -32,8 +40,9 @@ public class AnalyzeVocalJob {
         for (VocalEnum vocalEnum : VocalEnum.values()) {
             String[] keywords = lambda.apply(vocalEnum).split("\\|");
             for (String keyword : keywords) {
-                if (string.toLowerCase().contains(keyword)) {
+                if (!StringUtils.isNullOrEmpty(keyword) && preHandle(string).contains(keyword)) {
                     list.add(vocalEnum);
+                    break; // 避免这个虚拟歌手被添加两次
                 }
             }
         }
@@ -81,12 +90,55 @@ public class AnalyzeVocalJob {
      * @param videoStaticDOList 视频静态信息列表
      * @return 歌手列表
      */
-    public List<VideoVocalDO> analyze(List<VideoStaticDO> videoStaticDOList) {
+    private List<VideoVocalDO> analyze(List<VideoStaticDO> videoStaticDOList) {
         List<VideoVocalDO> videoVocalDOList = new ArrayList<>();
         for (VideoStaticDO videoStaticDO :videoStaticDOList) {
             List<VideoVocalDO> list = analyzeVocal(videoStaticDO);
             videoVocalDOList.addAll(list);
         }
         return videoVocalDOList;
+    }
+
+    /**
+     * 从数据表读入视频数据，并且分析是哪些歌手唱的，再插入到数据表中。
+     */
+    public void run() throws SQLException, ClassNotFoundException {
+        MysqlDao mysqlDao = new MysqlDao();
+        int totalSize = 0;
+
+        // 定义起始和结束年月
+        int startYear = 2024;
+        int startMonth = 9;
+        int endYear = 2024;
+        int endMonth = 11;
+
+        // 遍历每个月
+        for (int year = startYear; year <= endYear; year++) {
+            int startM = (year == startYear) ? startMonth : 1;
+            int endM = (year == endYear) ? endMonth : 12;
+
+            for (int month = startM; month <= endM; month++) {
+                // 获取该月的第一天的开始时间
+                LocalDateTime firstDayOfMonth = LocalDateTime.of(year, month, 1, 0, 0, 0);
+                int startTime = (int) firstDayOfMonth.toEpochSecond(ZoneOffset.UTC);
+
+                // 获取该月的最后一天的结束时间
+                LocalDateTime lastDayOfMonth = firstDayOfMonth
+                        .plusMonths(1) // 跳到下个月
+                        .minusSeconds(1); // 回退一秒
+                int endTime = (int) lastDayOfMonth.toEpochSecond(ZoneOffset.UTC);
+
+                // 调用函数
+                logger.debug("To read video text info for month {}-{}.", year, month);
+                List<VideoStaticDO> videoStaticDOList = mysqlDao.getVideoTextInfoList(startTime, endTime);
+                logger.debug("To analyze vocal for month {}-{}.", year, month);
+                List<VideoVocalDO> videoVocalDOList = analyze(videoStaticDOList);
+                logger.debug("To save data for month {}-{}.", year, month);
+                mysqlDao.insertRelVideoVocal(videoVocalDOList);
+                totalSize += videoStaticDOList.size();
+            }
+        }
+
+        logger.info("Success FINISH analyzing vocal info for video. totalSize: {}", totalSize);
     }
 }

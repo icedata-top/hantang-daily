@@ -1,9 +1,6 @@
 package dao;
 
-import dos.TypeDO;
-import dos.UserDO;
-import dos.VideoDynamicDO;
-import dos.VideoStaticDO;
+import dos.*;
 import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -109,6 +106,67 @@ public class MysqlDao {
         }
         return allVideoIdList;
     }
+
+    /**
+     * 获取当前正在观测的视频列表
+     *
+     * @param priority 优先度
+     * @return 视频AV号列表
+     */
+    public List<Long> getObservingVideoList(int priority) throws SQLException {
+        String sql = "SELECT aid FROM video_static WHERE priority = ?;";
+        // 创建PreparedStatement
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setInt(1, priority);  // priority 优先度
+
+            // 执行查询
+            ResultSet resultSet = preparedStatement.executeQuery();
+            List<Long> observingVideoList = new ArrayList<>();
+            while (resultSet.next()) {
+                observingVideoList.add(resultSet.getLong("aid"));
+            }
+
+            // 关闭ResultSet和PreparedStatement
+            resultSet.close();
+            return observingVideoList;
+        }
+    }
+
+    /**
+     * 获取歌曲的文本信息（标题、简介、标签）
+     *
+     * @param startTime 投稿时间的左端点
+     * @param endTime 投稿时间的右端点
+     */
+    public List<VideoStaticDO> getVideoTextInfoList(int startTime, int endTime) throws SQLException {
+        String sql = "SELECT `aid`,`title`,`tag`,`description` FROM video_static WHERE pubdate BETWEEN ? AND ?;";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setInt(1, startTime);
+            preparedStatement.setInt(2, endTime);
+
+            // 执行查询
+            ResultSet resultSet = preparedStatement.executeQuery();
+            List<VideoStaticDO> resultList = new ArrayList<>();
+            while (resultSet.next()) {
+                resultList.add(new VideoStaticDO(
+                        resultSet.getLong("aid"),
+                        null,
+                        -1,
+                        resultSet.getString("title"),
+                        resultSet.getString("description"),
+                        resultSet.getString("tag"),
+                        null,
+                        null,
+                        null
+                ));
+            }
+
+            // 关闭ResultSet和PreparedStatement
+            resultSet.close();
+            return resultList;
+        }
+    }
+
 
     /**
      * 插入或更新video_static
@@ -266,27 +324,33 @@ public class MysqlDao {
     }
 
     /**
-     * 获取当前正在观测的视频列表
-     *
-     * @param priority 优先度
-     * @return 视频AV号列表
+     * 插入到歌曲与虚拟歌手关系表 olap_rel_video_vocal
      */
-    public List<Long> getObservingVideoList(int priority) throws SQLException {
-        String sql = "SELECT aid FROM video_static WHERE priority = ?;";
+    public void insertRelVideoVocal(List<VideoVocalDO> videoVocalDOList) throws SQLException {
+        String sql = "INSERT INTO olap_rel_video_vocal (aid, vocal_id) " +
+                "VALUES (?, ?)";
+
         // 创建PreparedStatement
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-            preparedStatement.setInt(1, priority);  // priority 优先度
+            int count = 0;
 
-            // 执行查询
-            ResultSet resultSet = preparedStatement.executeQuery();
-            List<Long> observingVideoList = new ArrayList<>();
-            while (resultSet.next()) {
-                observingVideoList.add(resultSet.getLong("aid"));
+            for (VideoVocalDO videoVocalDO : videoVocalDOList) {
+                preparedStatement.setLong(1, videoVocalDO.aid());
+                preparedStatement.setInt(2, videoVocalDO.vocalId());
+
+                // 添加到批量中
+                preparedStatement.addBatch();
+                count++;
+
+                // 当批量大小达到设定值时，执行批量插入
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
             }
 
-            // 关闭ResultSet和PreparedStatement
-            resultSet.close();
-            return observingVideoList;
+            // 插入剩余的记录
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into olap_rel_video_vocal. rows: {}", videoVocalDOList.size());
         }
     }
 }

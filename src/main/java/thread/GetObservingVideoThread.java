@@ -35,12 +35,12 @@ public class GetObservingVideoThread extends Thread {
                 if (minute % priority != 0) {
                     continue;
                 }
-                List<Long> observingVideoList = mysqlDao.getObservingVideoList(PRIORITY);
+                List<Long> observingVideoList = mysqlDao.getObservingVideoList(priority);
                 for (Long aid : observingVideoList) {
                     if (aid == null) {
                         continue;
                     }
-                    toGetDataQueue.add(new VideoWithPriorityDO(aid, PRIORITY));
+                    toGetDataQueue.add(new VideoWithPriorityDO(aid, priority));
                 }
             }
         } catch (SQLException e) {

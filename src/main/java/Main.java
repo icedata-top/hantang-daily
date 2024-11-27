@@ -1,3 +1,4 @@
+import business.AnalyzeVocalJob;
 import business.HantangMinuteJob;
 import business.TodayDynamicDataJob;
 import business.TodayStaticDataJob;
@@ -25,7 +26,7 @@ public class Main {
         if ("full".equalsIgnoreCase(command)) {
             fullTask();
         } else if ("static".equalsIgnoreCase(command)) {
-            normalStaticTasks();
+            normalStaticTask();
         } else if ("dynamic".equalsIgnoreCase(command)) {
             normalDynamicTask();
         } else if ("minute".equalsIgnoreCase(command)) {
@@ -33,6 +34,13 @@ public class Main {
                 HantangMinuteJob.main(args);
             } catch (SQLException | IOException | ClassNotFoundException e) {
                 logger.error("Error happened when execute Hantang Minute Job. exception: .", e);
+            }
+        } else if ("olap_vocal".equalsIgnoreCase(command)) {
+            try {
+                AnalyzeVocalJob analyzeVocalJob = new AnalyzeVocalJob();
+                analyzeVocalJob.run();
+            } catch (SQLException | ClassNotFoundException e) {
+                logger.error("Error happened when execute analyze vocal Job. exception: .", e);
             }
         }
         long deltaTime = System.currentTimeMillis() - startTime;
@@ -42,7 +50,7 @@ public class Main {
     /**
      * 普通静态任务。搜索关键词，获取1日内的静态信息。
      */
-    private static void normalStaticTasks() {
+    private static void normalStaticTask() {
         try {
             // (1) 增量获取视频静态信息
             TodayStaticDataJob todayStaticDataJob = new TodayStaticDataJob();
