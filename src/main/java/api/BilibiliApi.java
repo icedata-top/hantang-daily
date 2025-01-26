@@ -149,6 +149,7 @@ public class BilibiliApi {
                     cntInfo.getIntValue("reply"), // reply
                     cntInfo.getIntValue("share"), // share
                     cntInfo.getIntValue("thumb_up"), // like
+                    dataElem.getIntValue("pubtime"), // pubtime
                     new UserDO(
                             upper.getLongValue("mid"),
                             upper.getString("name"),

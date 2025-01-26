@@ -10,5 +10,6 @@ public record VideoDynamicDO(
         int reply,
         int share,
         int like,
+        int pubtime,
         UserDO userDO
 ) {}
