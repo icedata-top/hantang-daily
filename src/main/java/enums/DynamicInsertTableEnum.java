@@ -1,7 +1,7 @@
 package enums;
 
 public enum DynamicInsertTableEnum {
-    DAILY("video_dynamic", "record_date"),
+    DAILY("video_daily", "record_date"),
     MINUTE("video_minute", "time");
 
     // 将属性设置为 final

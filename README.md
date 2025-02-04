@@ -9,7 +9,7 @@
 | 主要功能  | (1) 每日增量获取静态数据<br>(2) 每日全量获取动态数据 | 每分钟获取动态数据      |
 | 时间粒度  | 每天                               | 每分钟            |
 | 调度方式  | 操作系统 (OS)                        | Java虚拟机 (JVM)  |
-| 写 入 表 | `video_dynamic`                  | `video_minute` |
+| 写 入 表 | `video_daily`                    | `video_minute` |
 | 应用前身  | 天钿 Daily (模仿)                    | 寒棠 2.0         |
 | 下游应用  | 统计月报、洛榜、年榜等                      | 殿堂、传说计时        |
 
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS video_static (
 该表由寒棠 Daily 每天写入。
 
 ```mysql-sql
-CREATE TABLE IF NOT EXISTS video_dynamic (
+CREATE TABLE IF NOT EXISTS video_daily (
     `record_date` DATE NOT NULL COMMENT '记录日期', 
     `aid` BIGINT NOT NULL COMMENT '视频的 AV 号',
     `bvid` VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',

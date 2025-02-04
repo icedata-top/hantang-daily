@@ -83,7 +83,7 @@ User ID is not stored here because it is static data. Once a video is uploaded, 
 
 
 ```mysql-sql
-CREATE TABLE IF NOT EXISTS video_dynamic (
+CREATE TABLE IF NOT EXISTS video_daily (
     `record_date` DATE NOT NULL COMMENT '记录日期', 
     `aid` BIGINT NOT NULL COMMENT '视频的 AV 号',
     `bvid` VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',

@@ -212,7 +212,7 @@ public class MysqlDao {
     }
 
     /**
-     * 插入video_dynamic
+     * 插入video_daily
      *
      * @param videoDynamicDOList 视频静态信息列表
      */
@@ -254,7 +254,7 @@ public class MysqlDao {
 
             // 插入剩余的记录
             preparedStatement.executeBatch();
-            logger.info("Successfully insert into video_dynamic. rows: {}", videoDynamicDOList.size());
+            logger.info("Successfully insert into video_daily. rows: {}", videoDynamicDOList.size());
         }
     }
 
