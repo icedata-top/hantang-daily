@@ -27,8 +27,8 @@
       <console name="Connection" type="STANDARD" schema="" session="Main"><![CDATA[select * from hantang.video_dynamic]]></console>
     </connection>
     <connection id="5fcb6724-079a-4207-8997-1853633dd85c">
-      <console name="冰数据阿里云MySQL-生产" type="STANDARD" schema="hantang" session="Main" />
-      <console name="冰数据阿里云MySQL-生产 1" type="STANDARD" schema="hantang_test" session="Main"><![CDATA[select count(*) from hantang_test.video_static]]></console>
+      <console name="冰数据阿里云MySQL-生产" type="STANDARD" schema="hantang_test" session="Main"><![CDATA[truncate table hantang_test.video_static]]></console>
+      <console name="冰数据阿里云MySQL-生产 1" type="STANDARD" schema="hantang_test" session="Main"><![CDATA[select * from hantang_test.video_static limit 1]]></console>
     </connection>
   </component>
   <component name="DBNavigator.Project.DatabaseEditorStateManager">
@@ -36,6 +36,7 @@
   </component>
   <component name="DBNavigator.Project.DatabaseFileManager">
     <open-files>
+      <object connection-id="5fcb6724-079a-4207-8997-1853633dd85c" object-ref="consoles/冰数据阿里云MySQL-生产" />
       <object connection-id="5fcb6724-079a-4207-8997-1853633dd85c" object-ref="consoles/冰数据阿里云MySQL-生产 1" />
     </open-files>
   </component>

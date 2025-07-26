@@ -59,10 +59,8 @@ public class TodayStaticDataJob {
         for (String keyword : KEYWORDS) {
             boolean isPubdateInLimit = true;
             int pageTotal = 1000 / PAGE_SIZE;
-            // 测试环境下
-            pageTotal = 1;
             for (int page = 1; page <= pageTotal && isPubdateInLimit; page++) {
-                logger.debug("Getting static data (search results) from Bilibili API. keyword: {}, page: {}.", keyword, page);
+                logger.debug("Getting static data (search results) from API. keyword: {}, page: {}.", keyword, page);
                 List<VideoStaticDO> curVideoStaticDOList = bilibiliApi.getSearchResult(keyword, page, PAGE_SIZE);
                 for (VideoStaticDO videoStaticDO : curVideoStaticDOList) {
                     // 如果超出时间范围，要跳出两层for循环。
@@ -81,7 +79,7 @@ public class TodayStaticDataJob {
             }
         }
         long deltaTime = System.currentTimeMillis() - startTime;
-        logger.info("Successfully get HTTP response from Bilibili. Time: {} ms, count: {}", deltaTime, aidSet.size());
+        logger.info("Successfully get all HTTP response from Bilibili or Proxy. Time: {} ms, count: {}", deltaTime, aidSet.size());
     }
 
     public List<VideoStaticDO> getAllVideoStaticDOList() {
