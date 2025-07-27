@@ -5,101 +5,118 @@ import dos.TypeDO;
 import dos.UserDO;
 import dos.VideoDynamicDO;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.Properties;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import dos.VideoStaticDO;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import utils.HttpUtils;
 
 public class BilibiliApi {
     private static final Logger logger = LogManager.getLogger(BilibiliApi.class);
+    private static final String PROXY_BASE_URL;
+    private static final String OFFICIAL_BASE_URL = "https://api.bilibili.com";
+    private static final long COOL_DOWN_PERIOD = 15 * 60 * 1000; // 15分钟
+    private volatile long bilibiliCoolDownUntil = 0; // 原子性访问
 
-    private static final String[] USER_AGENTS = {
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Safari/605.1.15",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
-    };
-
-    // 生成随机User-Agent
-    private static String getRandomUserAgent() {
-        Random random = new Random();
-        int index = random.nextInt(USER_AGENTS.length);
-        return USER_AGENTS[index];
-    }
-
-    // 生成随机的DedeUserID (10位整数)
-    private static String getRandomDedeUserID() {
-        Random random = new Random();
-        int dedeUserID = 1000000000 + random.nextInt(900000000); // 生成10位数字
-        return String.valueOf(dedeUserID);
-    }
-
-    /**
-     * 获取HTTP连接，实际上是准备HTTP请求头的各种参数。
-     *
-     * @param urlString URL字符串，需要加上已有的WBI验权参数w_rid和wts
-     * @return HTTP连接
-     */
-    private HttpURLConnection getHttpURLConnection(String urlString) throws URISyntaxException, IOException {
-        URI uri = new URI(urlString);
-        URL apiUrl = uri.toURL();
-        HttpURLConnection connection = (HttpURLConnection) apiUrl.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setConnectTimeout(5000);
-
-        // 随机选取User-Agent
-        String userAgent = getRandomUserAgent();
-        // 随机生成DedeUserID
-        String dedeUserID = getRandomDedeUserID();
-
-        connection.setRequestProperty("User-Agent", userAgent);
-        connection.setRequestProperty("Cookie", "buvid_fp_plain=undefined; DedeUserID=" + dedeUserID + ";");
-        return connection;
-    }
-
-    /**
-     * 按URL字符串调用API。考虑到B站的API参数都是带在URL里的，不需要额外写请求体。
-     *
-     * @param urlString URL字符串，需要带上参数（含WBI验权参数w_rid和wts）
-     * @return HTTP响应字符串
-     */
-    private String callApiByUrlString(String urlString) throws IOException {
+    static {
         try {
-            long startTime = System.currentTimeMillis();
-            HttpURLConnection connection = getHttpURLConnection(urlString);
-            int responseCode = connection.getResponseCode();
-
-            // 如果响应码是200，则读取响应体
-            if (responseCode == 200) {
-                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String inputLine;
-                StringBuilder response = new StringBuilder();
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
-                in.close();
-                connection.disconnect();
-                long deltaTime = System.currentTimeMillis() - startTime;
-                logger.info("Successfully get HTTP response from Bilibili. Time: {} ms, URL: {}", deltaTime, urlString);
-                return response.toString();
-            } else {
-                connection.disconnect();
-                throw new IOException("Failed to fetch video info. HTTP response code: " + responseCode);
-            }
-        } catch (Exception e) {
-            throw new IOException("Failed to construct URL or fetch video info", e);
+            Properties properties = new Properties();
+            FileInputStream input = new FileInputStream("config.secret.properties");
+            properties.load(input);
+            PROXY_BASE_URL = properties.getProperty("proxy.base_url");
+        } catch (IOException e) {
+            e.fillInStackTrace();
+            throw new RuntimeException("无法加载数据库配置文件", e);
         }
+    }
+
+    /**
+     * 通过API路径调用B站接口（先尝试官方API，失败后尝试代理API）
+     *
+     * @param apiPath API路径（含参数，如/x/space/wbi/acc/info?w_rid=xxx&wts=xxx）
+     * @return HTTP响应内容
+     * @throws IOException 当所有尝试均失败时抛出
+     */
+    private String fetchBilibiliApiWithFallback(String apiPath) throws IOException {
+        long startTime = System.currentTimeMillis();
+        String result;
+        IOException lastException = null;
+
+        // 检查是否在冷却期内
+        boolean inCoolDown = System.currentTimeMillis() < bilibiliCoolDownUntil;
+
+        // 优先尝试官方域名（如果不在冷却期）
+        if (!inCoolDown) {
+            try {
+                String officialUrl = combineUrl(OFFICIAL_BASE_URL, apiPath);
+                result = HttpUtils.callApiWithRetry(officialUrl, 1, 2000);
+                if (StringUtils.isNotEmpty(result)) {
+                    logSuccess("Bilibili Official", startTime, officialUrl);
+                    return result;
+                } else {
+                    throw new IOException("Failed to get data from Bilibili official API. response is null or empty.");
+                }
+            } catch (IOException e) {
+                lastException = e;
+                logger.warn("Official API request failed, activating 15-minute cooldown. Path: {}", apiPath, e);
+                bilibiliCoolDownUntil = System.currentTimeMillis() + COOL_DOWN_PERIOD; // 开启冷却
+            }
+        }
+
+        // 降级到代理域名（重试3次）
+        try {
+            String proxyUrl = combineUrl(PROXY_BASE_URL, apiPath);
+            result = HttpUtils.callApiWithRetry(proxyUrl, 3, 2000);
+            if (StringUtils.isNotEmpty(result)) {
+                logSuccess("Proxy", startTime, proxyUrl);
+                return result;
+            }
+        } catch (IOException e) {
+            logger.error("Proxy API request also failed. Path: {}", apiPath, e);
+            throw new IOException("Failed after trying both official and proxy domains",
+                    lastException != null ? lastException : e);
+        }
+
+        throw new IOException("Got empty response from both sources");
+    }
+
+
+    /**
+     * 日志成功
+     *
+     * @param source    来源
+     * @param startTime 起始时间
+     * @param url       URL
+     */
+    private void logSuccess(String source, long startTime, String url) {
+        long deltaTime = System.currentTimeMillis() - startTime;
+        logger.info("Successfully fetched from {} API. Time: {} ms, URL: {}",
+                source, deltaTime, url);
+    }
+
+    /**
+     * 合并 URL，会自动判断是否有没有“/”
+     *
+     * @param baseUrl 基础 URL，例如 “https://api.bilibili.com”
+     * @param path    路径，例如 “/medialist/gateway/base/resource/infos?resources”
+     */
+    private static String combineUrl(String baseUrl, String path) {
+        if (StringUtils.isEmpty(baseUrl) || StringUtils.isEmpty(path)) {
+            throw new IllegalArgumentException("Base URL or Path can not be null or empty");
+        }
+        if (path.startsWith("/")) {
+            return baseUrl + path;
+        }
+        return baseUrl + "/" + path;
     }
 
     /**
@@ -111,12 +128,12 @@ public class BilibiliApi {
      */
     private String getVideoInfoApi(List<Long> aidList) throws IOException {
         StringBuilder urlString = new StringBuilder();
-        urlString.append("https://api.bilibili.com/medialist/gateway/base/resource/infos?resources=");
+        urlString.append("/medialist/gateway/base/resource/infos?resources=");
         for (Long aid : aidList) {
             urlString.append(aid).append(":2,");
         }
         urlString.deleteCharAt(urlString.length() - 1);
-        return callApiByUrlString(urlString.toString());
+        return fetchBilibiliApiWithFallback(urlString.toString());
     }
 
     /**
@@ -174,14 +191,14 @@ public class BilibiliApi {
         // https://api.bilibili.com/x/web-interface/wbi/search/type?__refresh__=true&_extra=&ad_resource=5654&category_id=&context=&dynamic_offset=0&from_source=&from_spmid=333.337&gaia_vtoken=&highlight=1&keyword=%E6%B4%9B%E5%A4%A9%E4%BE%9D&order=click&page=1&page_size=42&platform=pc&pubtime_begin_s=0&pubtime_end_s=0&qv_id=iVHJSCLIWTe9FksiKu8bIfxA6MD53z3P&search_type=video&single_column=0&source_tag=3&web_location=1430654&w_rid=dbcec74cd4e721a8902cf64211dd62a5&wts=1727799448
         String encodeKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
         String urlString2 = String.format(
-                "https://api.bilibili.com/x/web-interface/wbi/search/type?__refresh__=true&_extra=&ad_resource=5654&category_id=&context=&dynamic_offset=0&from_source=&from_spmid=333.337&gaia_vtoken=&highlight=1&keyword=%s&order=%s&page=%d&page_size=%d&platform=pc&pubtime_begin_s=0&pubtime_end_s=0&qv_id=iVHJSCLIWTe9FksiKu8bIfxA6MD53z3P&search_type=video&single_column=0&source_tag=3&web_location=1430654",
+                "/x/web-interface/wbi/search/type?__refresh__=true&_extra=&ad_resource=5654&category_id=&context=&dynamic_offset=0&from_source=&from_spmid=333.337&gaia_vtoken=&highlight=1&keyword=%s&order=%s&page=%d&page_size=%d&platform=pc&pubtime_begin_s=0&pubtime_end_s=0&qv_id=iVHJSCLIWTe9FksiKu8bIfxA6MD53z3P&search_type=video&single_column=0&source_tag=3&web_location=1430654",
                 encodeKeyword,
                 "pubdate",
                 page,
                 pageSize
         );
         String urlString = Wbi.getInstance().addWbiParam(urlString2);
-        return callApiByUrlString(urlString);
+        return fetchBilibiliApiWithFallback(urlString);
     }
 
     /**
