@@ -23,7 +23,8 @@ public class TodayDynamicDataJob {
     private final List<Long> allVideoIdList;
     private final List<VideoDynamicDO> allVideoDynamicDOList;
     private static final int GROUP_SIZE;
-    private static final int EXECUTORS_SIZE;
+    private static final int EXECUTORS_SIZE_OFFICIAL;
+    private static final int EXECUTORS_SIZE_PROXY;
     private static final Logger logger = LogManager.getLogger(TodayDynamicDataJob.class);
 
     public TodayDynamicDataJob(List<Long> allVideoIdList) {
@@ -40,7 +41,10 @@ public class TodayDynamicDataJob {
 
             // 读取配置
             GROUP_SIZE = Integer.parseInt(properties.getProperty("dynamic.group_size", "25"));
-            EXECUTORS_SIZE = Integer.parseInt(properties.getProperty("dynamic.executors_size", "10"));
+            EXECUTORS_SIZE_OFFICIAL = Integer.parseInt(
+                properties.getProperty("dynamic.executors_size.official", "10"));
+            EXECUTORS_SIZE_PROXY = Integer.parseInt(
+                properties.getProperty("dynamic.executors_size.proxy", "30"));
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
@@ -66,7 +70,12 @@ public class TodayDynamicDataJob {
      */
     public void getData() throws IOException {
         BilibiliApi bilibiliApi = new BilibiliApi();
-        ExecutorService executorService = Executors.newFixedThreadPool(EXECUTORS_SIZE);
+
+        // 根据当前 API 状态选择线程池大小
+        int executorsSize = bilibiliApi.isUsingProxy() ?
+            EXECUTORS_SIZE_PROXY : EXECUTORS_SIZE_OFFICIAL;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(executorsSize);
 
         List<Future<List<VideoDynamicDO>>> futures = new ArrayList<>();
         int groupCount = (allVideoIdList.size() + GROUP_SIZE - 1) / GROUP_SIZE;

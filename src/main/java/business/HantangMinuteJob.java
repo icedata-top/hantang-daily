@@ -1,5 +1,6 @@
 package business;
 
+import api.ApiStateListener;
 import api.BilibiliApi;
 import dao.MysqlDao;
 import dos.VideoDynamicDO;
@@ -7,6 +8,7 @@ import dos.VideoWithPriorityDO;
 import thread.GetDataThread;
 import thread.GetObservingVideoThread;
 import thread.InsertThread;
+import utils.DynamicThreadPool;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -22,10 +24,16 @@ public class HantangMinuteJob {
 
     // 线程池 及 线程池大小
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private static final int NUM_GET_DATA_THREADS;
-    private static final ExecutorService getDataPool;
-    private static final int NUM_INSERT_THREADS;
-    private static final ExecutorService insertPoll;
+
+    // 线程池配置
+    private static final int NUM_GET_DATA_THREADS_OFFICIAL;
+    private static final int NUM_INSERT_THREADS_OFFICIAL;
+    private static final int NUM_GET_DATA_THREADS_PROXY;
+    private static final int NUM_INSERT_THREADS_PROXY;
+
+    // 动态线程池
+    private static final DynamicThreadPool getDataPool;
+    private static final DynamicThreadPool insertPool;
 
     static {
         try {
@@ -34,13 +42,31 @@ public class HantangMinuteJob {
             FileInputStream input = new FileInputStream("config.properties");
             properties.load(input);
 
-            // 读取配置
-            NUM_GET_DATA_THREADS = Integer.parseInt(properties.getProperty("minute.num_get_data_threads", "4"));
-            NUM_INSERT_THREADS = Integer.parseInt(properties.getProperty("minute.num_insert_threads", "2"));
+            // 读取官方 API 和代理 API 的不同配置
+            NUM_GET_DATA_THREADS_OFFICIAL = Integer.parseInt(
+                properties.getProperty("minute.num_get_data_threads.official", "4"));
+            NUM_INSERT_THREADS_OFFICIAL = Integer.parseInt(
+                properties.getProperty("minute.num_insert_threads.official", "2"));
+            NUM_GET_DATA_THREADS_PROXY = Integer.parseInt(
+                properties.getProperty("minute.num_get_data_threads.proxy", "12"));
+            NUM_INSERT_THREADS_PROXY = Integer.parseInt(
+                properties.getProperty("minute.num_insert_threads.proxy", "6"));
 
-            // 初始化固定线程池
-            getDataPool = Executors.newFixedThreadPool(NUM_GET_DATA_THREADS);
-            insertPoll = Executors.newFixedThreadPool(NUM_INSERT_THREADS);
+            // 初始化动态线程池（使用官方 API 配置）
+            getDataPool = new DynamicThreadPool("MinuteJob-GetData", NUM_GET_DATA_THREADS_OFFICIAL);
+            insertPool = new DynamicThreadPool("MinuteJob-Insert", NUM_INSERT_THREADS_OFFICIAL);
+
+            // 注册 API 状态监听器
+            BilibiliApi.addStateListener(new ApiStateListener() {
+                @Override
+                public void onApiStateChanged(boolean useProxy) {
+                    int getDataThreads = useProxy ? NUM_GET_DATA_THREADS_PROXY : NUM_GET_DATA_THREADS_OFFICIAL;
+                    int insertThreads = useProxy ? NUM_INSERT_THREADS_PROXY : NUM_INSERT_THREADS_OFFICIAL;
+
+                    getDataPool.resize(getDataThreads);
+                    insertPool.resize(insertThreads);
+                }
+            });
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
@@ -53,14 +79,14 @@ public class HantangMinuteJob {
         GetObservingVideoThread oThread = new GetObservingVideoThread(toGetDataQueue, new MysqlDao());
         scheduler.scheduleWithFixedDelay(oThread, 0, 60, TimeUnit.SECONDS);
 
-        // 创建多个 GetDataTask
-        for (int i = 0; i < NUM_GET_DATA_THREADS; i++) {
+        // 提交 GetDataThread 任务
+        for (int i = 0; i < NUM_GET_DATA_THREADS_OFFICIAL; i++) {
             getDataPool.submit(new GetDataThread(toGetDataQueue, toInsertQueue));
         }
 
-        // 创建多个 InsertTask
-        for (int i = 0; i < NUM_INSERT_THREADS; i++) {
-            insertPoll.submit(new InsertThread(toInsertQueue));
+        // 提交 InsertThread 任务
+        for (int i = 0; i < NUM_INSERT_THREADS_OFFICIAL; i++) {
+            insertPool.submit(new InsertThread(toInsertQueue));
         }
     }
 
