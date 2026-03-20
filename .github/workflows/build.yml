@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup GraalVM
         uses: graalvm/setup-graalvm@v1
@@ -47,14 +47,14 @@ jobs:
         run: mvn -B -Pnative package -DskipTests
 
       - name: Upload native executable
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact-name }}
           path: target/${{ matrix.executable }}
 
       - name: Upload fat JAR
         if: matrix.arch == 'amd64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: hantang-daily-jar
           path: target/*-jar-with-dependencies.jar
@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
 
