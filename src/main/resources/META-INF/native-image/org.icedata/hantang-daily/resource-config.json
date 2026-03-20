@@ -1,0 +1,11 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "log4j2\\.xml$"},
+      {"pattern": "META-INF/services/.*"},
+      {"pattern": "META-INF/native-image/.*"},
+      {"pattern": "com/mysql/cj/.*\\.properties$"},
+      {"pattern": "com/mysql/cj/.*\\.xml$"}
+    ]
+  }
+}
