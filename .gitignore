@@ -21,3 +21,8 @@ bin-release/
 # information for Eclipse / Flash Builder.
 
 /scripts/
+
+# AI
+.claude
+CLAUDE.md
+AGENT.md
