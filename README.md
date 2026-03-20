@@ -274,6 +274,10 @@ db.password_local=${your user password}
 ### 日志
 本项目的日志使用`Log4j2`依赖，默认生成在`./logs`目录下。不需要手动创建该目录，因为会自动创建。
 
+## CI/CD 自动化
+
+本项目配置了 GitHub Actions 进行自动化构建和发布。
+
 ## 编译与启动
 
 在确保Maven依赖、JDK版本等信息之后，可以编译或启动本项目。
