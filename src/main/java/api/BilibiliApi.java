@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -26,6 +27,8 @@ public class BilibiliApi {
     private static final String OFFICIAL_BASE_URL = "https://api.bilibili.com";
     private static final long COOL_DOWN_PERIOD = 15 * 60 * 1000; // 15分钟
     private volatile long bilibiliCoolDownUntil = 0; // 原子性访问
+    private static final List<ApiStateListener> listeners = new CopyOnWriteArrayList<>();
+    private volatile boolean isUsingProxy = false;
 
     static {
         try {
@@ -36,6 +39,37 @@ public class BilibiliApi {
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
+        }
+    }
+
+    /**
+     * 注册 API 状态监听器
+     */
+    public static void addStateListener(ApiStateListener listener) {
+        listeners.add(listener);
+    }
+
+    /**
+     * 获取当前是否正在使用代理 API
+     */
+    public boolean isUsingProxy() {
+        return isUsingProxy;
+    }
+
+    /**
+     * 通知所有监听器 API 状态已改变
+     */
+    private void notifyListeners(boolean useProxy) {
+        if (this.isUsingProxy != useProxy) {
+            this.isUsingProxy = useProxy;
+            logger.info("API state changed to: {}", useProxy ? "Proxy" : "Official");
+            for (ApiStateListener listener : listeners) {
+                try {
+                    listener.onApiStateChanged(useProxy);
+                } catch (Exception e) {
+                    logger.error("Error notifying listener", e);
+                }
+            }
         }
     }
 
@@ -56,6 +90,9 @@ public class BilibiliApi {
 
         // 优先尝试官方域名（如果不在冷却期）
         if (!inCoolDown) {
+            if (isUsingProxy) {
+                notifyListeners(false); // 从代理切回官方
+            }
             try {
                 String officialUrl = combineUrl(OFFICIAL_BASE_URL, apiPath);
                 result = HttpUtils.callApiWithRetry(officialUrl, 1, 2000);
@@ -69,6 +106,7 @@ public class BilibiliApi {
                 lastException = e;
                 logger.warn("Official API request failed, activating 15-minute cooldown. Path: {}", apiPath, e);
                 bilibiliCoolDownUntil = System.currentTimeMillis() + COOL_DOWN_PERIOD; // 开启冷却
+                notifyListeners(true); // 切换到代理
             }
         }
 
