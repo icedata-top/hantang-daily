@@ -49,6 +49,10 @@ public class MysqlDao {
      */
     private static final int QUERY_SIZE = 10000;
 
+    public static int getInsertBatchSize() {
+        return INSERT_SIZE;
+    }
+
     public MysqlDao() throws SQLException, ClassNotFoundException {
         Class.forName("com.mysql.cj.jdbc.Driver");
 
@@ -216,21 +220,33 @@ public class MysqlDao {
      *
      * @param videoDynamicDOList 视频静态信息列表
      */
+    public void insertDailyDynamic(List<VideoDynamicDO> videoDynamicDOList, String recordDate) throws SQLException {
+        insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY, recordDate, (int) (System.currentTimeMillis() / 1000L));
+    }
+
     public void insertDynamic(List<VideoDynamicDO> videoDynamicDOList, DynamicInsertTableEnum tableEnum) throws SQLException {
-        String sql = String.format("INSERT INTO %s (%s, aid, bvid, coin, favorite, danmaku, view, reply, share, `like`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", tableEnum.getTable(), tableEnum.getTimeColumn());
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
         String today = dateFormat.format(new Date());
         int now = (int) (System.currentTimeMillis() / 1000L);
+        insertDynamic(videoDynamicDOList, tableEnum, today, now);
+    }
 
+    private void insertDynamic(
+            List<VideoDynamicDO> videoDynamicDOList,
+            DynamicInsertTableEnum tableEnum,
+            String recordDate,
+            int recordTime
+    ) throws SQLException {
+        String sql = String.format("INSERT INTO %s (%s, aid, bvid, coin, favorite, danmaku, view, reply, share, `like`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", tableEnum.getTable(), tableEnum.getTimeColumn());
         // 创建PreparedStatement
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
             int count = 0;
 
             for (VideoDynamicDO video : videoDynamicDOList) {
                 if (DynamicInsertTableEnum.DAILY.equals(tableEnum)) {
-                    preparedStatement.setString(1, today);
+                    preparedStatement.setString(1, recordDate);
                 } else if (DynamicInsertTableEnum.MINUTE.equals(tableEnum)) {
-                    preparedStatement.setInt(1, now);
+                    preparedStatement.setInt(1, recordTime);
                 }
                 preparedStatement.setLong(2, video.aid());
                 preparedStatement.setString(3, video.bvid());
@@ -254,7 +270,7 @@ public class MysqlDao {
 
             // 插入剩余的记录
             preparedStatement.executeBatch();
-            logger.info("Successfully insert into video_daily. rows: {}", videoDynamicDOList.size());
+            logger.info("Successfully insert into {}. rows: {}", tableEnum.getTable(), videoDynamicDOList.size());
         }
     }
 

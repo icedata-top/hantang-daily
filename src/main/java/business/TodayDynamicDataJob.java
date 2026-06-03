@@ -1,6 +1,7 @@
 package business;
 
 import api.BilibiliApi;
+import dao.MysqlDao;
 import dos.UserDO;
 import dos.VideoDynamicDO;
 import org.apache.logging.log4j.LogManager;
@@ -8,10 +9,15 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -94,6 +100,94 @@ public class TodayDynamicDataJob {
         logger.info("Successfully finish all processes for getting dynamic data. Count of processes: {}", futures.size());
         // 关闭线程池
         executorService.shutdown();
+    }
+
+    /**
+     * 并发地调用API获取结果，并在每个批次完成后立即写入每日动态表。
+     */
+    public int getDataAndInsert(MysqlDao mysqlDao) throws IOException {
+        BilibiliApi bilibiliApi = new BilibiliApi();
+        ExecutorService executorService = Executors.newFixedThreadPool(EXECUTORS_SIZE);
+        CompletionService<List<VideoDynamicDO>> completionService = new ExecutorCompletionService<>(executorService);
+        int groupCount = (allVideoIdList.size() + GROUP_SIZE - 1) / GROUP_SIZE;
+        int submittedCount = 0;
+        int failedInsertCount = 0;
+        int insertBatchSize = MysqlDao.getInsertBatchSize();
+        List<VideoDynamicDO> pendingInsertList = new ArrayList<>(insertBatchSize);
+        String recordDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
+
+        try {
+            // 分组并发发起请求
+            for (int groupIndex = 0; groupIndex < groupCount; groupIndex++) {
+                int start = groupIndex * GROUP_SIZE;
+                int end = Math.min(start + GROUP_SIZE, allVideoIdList.size());
+                List<Long> sublist = allVideoIdList.subList(start, end);
+                logger.debug("Start process for getting dynamic data from {} to {}", start, end);
+                completionService.submit(() -> bilibiliApi.getVideoInfo(sublist));
+                submittedCount++;
+            }
+
+            // 按完成顺序收集并写入结果，避免等待所有批次结束后再落库。
+            for (int completedCount = 0; completedCount < submittedCount; completedCount++) {
+                try {
+                    List<VideoDynamicDO> videoDynamicDOList = completionService.take().get();
+                    allVideoDynamicDOList.addAll(videoDynamicDOList);
+                    pendingInsertList.addAll(videoDynamicDOList);
+                    failedInsertCount += flushReadyDailyDynamicBatches(
+                            mysqlDao,
+                            pendingInsertList,
+                            recordDate,
+                            insertBatchSize
+                    );
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    logger.error("Interrupted while fetching video dynamic data.", e);
+                    break;
+                } catch (ExecutionException e) {
+                    logger.error("Error occurred while fetching video info.", e);
+                }
+            }
+            failedInsertCount += flushDailyDynamicBatch(mysqlDao, pendingInsertList, recordDate);
+
+            logger.info("Successfully finish all processes for getting and inserting dynamic data. Count of processes: {}", submittedCount);
+            return failedInsertCount;
+        } finally {
+            executorService.shutdown();
+        }
+    }
+
+    private int flushReadyDailyDynamicBatches(
+            MysqlDao mysqlDao,
+            List<VideoDynamicDO> pendingInsertList,
+            String recordDate,
+            int insertBatchSize
+    ) {
+        int failedInsertCount = 0;
+        while (pendingInsertList.size() >= insertBatchSize) {
+            List<VideoDynamicDO> batch = new ArrayList<>(pendingInsertList.subList(0, insertBatchSize));
+            pendingInsertList.subList(0, insertBatchSize).clear();
+            failedInsertCount += flushDailyDynamicBatch(mysqlDao, batch, recordDate);
+        }
+        return failedInsertCount;
+    }
+
+    private int flushDailyDynamicBatch(
+            MysqlDao mysqlDao,
+            List<VideoDynamicDO> videoDynamicDOList,
+            String recordDate
+    ) {
+        if (videoDynamicDOList.isEmpty()) {
+            return 0;
+        }
+        try {
+            mysqlDao.insertDailyDynamic(videoDynamicDOList, recordDate);
+            videoDynamicDOList.clear();
+            return 0;
+        } catch (SQLException e) {
+            logger.error("Error occurred while inserting video dynamic batch.", e);
+            videoDynamicDOList.clear();
+            return 1;
+        }
     }
 
     public List<VideoDynamicDO> getAllVideoDynamicDOList() {
