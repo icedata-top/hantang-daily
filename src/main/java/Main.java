@@ -11,6 +11,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 
 public class Main {
@@ -76,7 +78,7 @@ public class Main {
         try {
             MysqlDao mysqlDao = new MysqlDao();
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getAllVideoIdList();
+            List<Long> allVideoIdList = mysqlDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
@@ -110,7 +112,7 @@ public class Main {
             mysqlDao.insertStatic(videoStaticDOList);
 
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getAllVideoIdList();
+            List<Long> allVideoIdList = mysqlDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
@@ -132,5 +134,9 @@ public class Main {
         } catch (Exception e) {
             logger.error(e);
         }
+    }
+
+    private static boolean shouldIncludeSundayOnlyDailyCollection() {
+        return LocalDate.now().getDayOfWeek() == DayOfWeek.SUNDAY;
     }
 }
