@@ -43,8 +43,18 @@ public class HantangMinuteJob {
             properties.load(input);
 
             // 读取官方 API 和代理 API 的不同配置
-            NUM_GET_DATA_THREADS_OFFICIAL = getPositiveIntProperty(properties, "minute.num_get_data_threads.official", 4);
-            NUM_INSERT_THREADS_OFFICIAL = getPositiveIntProperty(properties, "minute.num_insert_threads.official", 2);
+            NUM_GET_DATA_THREADS_OFFICIAL = getPositiveIntProperty(
+                    properties,
+                    "minute.num_get_data_threads.official",
+                    "minute.num_get_data_threads",
+                    4
+            );
+            NUM_INSERT_THREADS_OFFICIAL = getPositiveIntProperty(
+                    properties,
+                    "minute.num_insert_threads.official",
+                    "minute.num_insert_threads",
+                    2
+            );
             NUM_GET_DATA_THREADS_PROXY = getPositiveIntProperty(properties, "minute.num_get_data_threads.proxy", 12);
             NUM_INSERT_THREADS_PROXY = getPositiveIntProperty(properties, "minute.num_insert_threads.proxy", 6);
 
@@ -112,26 +122,40 @@ public class HantangMinuteJob {
         }
     }
 
+    private static int getPositiveIntProperty(Properties properties, String key, String fallbackKey, int defaultValue) {
+        if (properties.getProperty(key) != null) {
+            return getPositiveIntProperty(properties, key, defaultValue);
+        }
+        return getPositiveIntProperty(properties, fallbackKey, defaultValue);
+    }
+
 
     /**
-     * 优先级比较器。优先级为0的排在最后，否则按数值从小到大排序。
+     * 优先级比较器。顺序为 1..720、0、-2。
      */
     static class PriorityComparator implements Comparator<VideoWithPriorityDO> {
         @Override
         public int compare(VideoWithPriorityDO o1, VideoWithPriorityDO o2) {
-            int p1 = o1.priority();
-            int p2 = o2.priority();
+            int rank1 = getPriorityRank(o1.priority());
+            int rank2 = getPriorityRank(o2.priority());
 
-            if (p1 == 0 && p2 == 0) {
+            if (rank1 != rank2) {
+                return Integer.compare(rank1, rank2);
+            }
+            return Integer.compare(o1.priority(), o2.priority());
+        }
+
+        private int getPriorityRank(int priority) {
+            if (priority >= 1 && priority <= 720) {
                 return 0;
             }
-            if (p1 == 0) {
+            if (priority == 0) {
                 return 1;
             }
-            if (p2 == 0) {
-                return -1;
+            if (priority == -2) {
+                return 2;
             }
-            return Integer.compare(p1, p2);
+            return 3;
         }
     }
 }

@@ -37,7 +37,7 @@ public class BilibiliApi {
             Properties properties = new Properties();
             FileInputStream input = new FileInputStream("config.secret.properties");
             properties.load(input);
-            PROXY_BASE_URL = properties.getProperty("proxy.base_url");
+            PROXY_BASE_URL = StringUtils.trimToNull(properties.getProperty("proxy.base_url"));
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
@@ -114,6 +114,9 @@ public class BilibiliApi {
         }
 
         // 降级到代理域名（重试3次）
+        if (StringUtils.isBlank(PROXY_BASE_URL)) {
+            throw new IOException("Official API request failed and proxy.base_url is not configured", lastException);
+        }
         try {
             String proxyUrl = combineUrl(PROXY_BASE_URL, apiPath);
             result = HttpUtils.callApiWithRetry(proxyUrl, 3, 2000);

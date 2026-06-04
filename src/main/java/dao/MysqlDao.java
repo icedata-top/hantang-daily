@@ -170,27 +170,28 @@ public class MysqlDao {
     }
 
     /**
-     * 获取当前正在观测的视频列表
+     * 获取当前分钟应该采集的视频列表。
      *
-     * @param priority 优先度
-     * @return 视频AV号列表
+     * @param minuteOfDay 当天第几分钟
+     * @return 视频及采集间隔列表
      */
-    public List<Long> getObservingVideoList(int priority) throws SQLException {
-        String sql = "SELECT aid FROM video_static WHERE priority = ?;";
-        // 创建PreparedStatement
+    public List<VideoWithPriorityDO> getDueMinuteCollectionVideoList(int minuteOfDay) throws SQLException {
+        String sql = "SELECT aid, priority FROM video_collection_state " +
+                "WHERE priority BETWEEN 1 AND 720 AND MOD(?, priority) = 0 " +
+                "ORDER BY priority, aid;";
         try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-            preparedStatement.setInt(1, priority);  // priority 优先度
+            preparedStatement.setInt(1, minuteOfDay);
 
-            // 执行查询
-            ResultSet resultSet = preparedStatement.executeQuery();
-            List<Long> observingVideoList = new ArrayList<>();
-            while (resultSet.next()) {
-                observingVideoList.add(resultSet.getLong("aid"));
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                List<VideoWithPriorityDO> observingVideoList = new ArrayList<>();
+                while (resultSet.next()) {
+                    observingVideoList.add(new VideoWithPriorityDO(
+                            resultSet.getLong("aid"),
+                            resultSet.getInt("priority")
+                    ));
+                }
+                return observingVideoList;
             }
-
-            // 关闭ResultSet和PreparedStatement
-            resultSet.close();
-            return observingVideoList;
         }
     }
 

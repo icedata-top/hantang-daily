@@ -47,7 +47,12 @@ public class TodayDynamicDataJob {
 
             // 读取配置
             GROUP_SIZE = getPositiveIntProperty(properties, "dynamic.group_size", 25);
-            EXECUTORS_SIZE_OFFICIAL = getPositiveIntProperty(properties, "dynamic.executors_size.official", 10);
+            EXECUTORS_SIZE_OFFICIAL = getPositiveIntProperty(
+                    properties,
+                    "dynamic.executors_size.official",
+                    "dynamic.executors_size",
+                    10
+            );
             EXECUTORS_SIZE_PROXY = getPositiveIntProperty(properties, "dynamic.executors_size.proxy", 30);
         } catch (IOException e) {
             e.fillInStackTrace();
@@ -69,6 +74,13 @@ public class TodayDynamicDataJob {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    private static int getPositiveIntProperty(Properties properties, String key, String fallbackKey, int defaultValue) {
+        if (properties.getProperty(key) != null) {
+            return getPositiveIntProperty(properties, key, defaultValue);
+        }
+        return getPositiveIntProperty(properties, fallbackKey, defaultValue);
     }
     /**
      * 串行地调用API获取结果
@@ -129,7 +141,9 @@ public class TodayDynamicDataJob {
      */
     public int getDataAndInsert(MysqlDao mysqlDao) throws IOException {
         BilibiliApi bilibiliApi = new BilibiliApi();
-        ExecutorService executorService = Executors.newFixedThreadPool(EXECUTORS_SIZE);
+        // 这个任务的线程池不能在运行中扩容，使用两种配置中的较大值。
+        int executorsSize = Math.max(EXECUTORS_SIZE_PROXY, EXECUTORS_SIZE_OFFICIAL);
+        ExecutorService executorService = Executors.newFixedThreadPool(executorsSize);
         CompletionService<List<VideoDynamicDO>> completionService = new ExecutorCompletionService<>(executorService);
         int groupCount = (allVideoIdList.size() + GROUP_SIZE - 1) / GROUP_SIZE;
         int submittedCount = 0;
