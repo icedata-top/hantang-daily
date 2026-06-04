@@ -40,14 +40,28 @@ public class TodayDynamicDataJob {
             properties.load(input);
 
             // 读取配置
-            GROUP_SIZE = Integer.parseInt(properties.getProperty("dynamic.group_size", "25"));
-            EXECUTORS_SIZE_OFFICIAL = Integer.parseInt(
-                properties.getProperty("dynamic.executors_size.official", "10"));
-            EXECUTORS_SIZE_PROXY = Integer.parseInt(
-                properties.getProperty("dynamic.executors_size.proxy", "30"));
+            GROUP_SIZE = getPositiveIntProperty(properties, "dynamic.group_size", 25);
+            EXECUTORS_SIZE_OFFICIAL = getPositiveIntProperty(properties, "dynamic.executors_size.official", 10);
+            EXECUTORS_SIZE_PROXY = getPositiveIntProperty(properties, "dynamic.executors_size.proxy", 30);
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
+        }
+    }
+
+    private static int getPositiveIntProperty(Properties properties, String key, int defaultValue) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+            throw new NumberFormatException("value must be positive");
+        } catch (NumberFormatException e) {
+            return defaultValue;
         }
     }
     /**
@@ -71,9 +85,8 @@ public class TodayDynamicDataJob {
     public void getData() throws IOException {
         BilibiliApi bilibiliApi = new BilibiliApi();
 
-        // 根据当前 API 状态选择线程池大小
-        int executorsSize = bilibiliApi.isUsingProxy() ?
-            EXECUTORS_SIZE_PROXY : EXECUTORS_SIZE_OFFICIAL;
+        // 这个任务的线程池不能在运行中扩容，使用两种配置中的较大值。
+        int executorsSize = Math.max(EXECUTORS_SIZE_PROXY, EXECUTORS_SIZE_OFFICIAL);
 
         ExecutorService executorService = Executors.newFixedThreadPool(executorsSize);
 

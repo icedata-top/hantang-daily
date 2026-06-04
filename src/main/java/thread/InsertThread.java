@@ -5,6 +5,7 @@ import dos.VideoDynamicDO;
 import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import utils.DynamicThreadPool;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -17,9 +18,17 @@ import java.util.concurrent.ArrayBlockingQueue;
 public class InsertThread extends Thread {
     private static final Logger logger = LogManager.getLogger(InsertThread.class);
     final ArrayBlockingQueue<VideoDynamicDO> toInsertQueue;
+    final DynamicThreadPool dynamicThreadPool;
+    final int workerIndex;
 
     public InsertThread(ArrayBlockingQueue<VideoDynamicDO> toInsertQueue) {
+        this(toInsertQueue, null, 0);
+    }
+
+    public InsertThread(ArrayBlockingQueue<VideoDynamicDO> toInsertQueue, DynamicThreadPool dynamicThreadPool, int workerIndex) {
         this.toInsertQueue = toInsertQueue;
+        this.dynamicThreadPool = dynamicThreadPool;
+        this.workerIndex = workerIndex;
     }
 
     @Override
@@ -27,6 +36,10 @@ public class InsertThread extends Thread {
         try {
             MysqlDao mysqlDao = new MysqlDao();
             while (true) {
+                if (!isWorkerActive()) {
+                    Thread.sleep(1000);
+                    continue;
+                }
                 List<VideoDynamicDO> recordToInsert = new ArrayList<>();
                 synchronized (toInsertQueue) {
                     toInsertQueue.drainTo(recordToInsert, 100);
@@ -44,5 +57,9 @@ public class InsertThread extends Thread {
         } catch (SQLException | ClassNotFoundException | InterruptedException e) {
             logger.error(e);
         }
+    }
+
+    private boolean isWorkerActive() {
+        return dynamicThreadPool == null || dynamicThreadPool.isWorkerActive(workerIndex);
     }
 }

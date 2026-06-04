@@ -43,18 +43,22 @@ public class HantangMinuteJob {
             properties.load(input);
 
             // 读取官方 API 和代理 API 的不同配置
-            NUM_GET_DATA_THREADS_OFFICIAL = Integer.parseInt(
-                properties.getProperty("minute.num_get_data_threads.official", "4"));
-            NUM_INSERT_THREADS_OFFICIAL = Integer.parseInt(
-                properties.getProperty("minute.num_insert_threads.official", "2"));
-            NUM_GET_DATA_THREADS_PROXY = Integer.parseInt(
-                properties.getProperty("minute.num_get_data_threads.proxy", "12"));
-            NUM_INSERT_THREADS_PROXY = Integer.parseInt(
-                properties.getProperty("minute.num_insert_threads.proxy", "6"));
+            NUM_GET_DATA_THREADS_OFFICIAL = getPositiveIntProperty(properties, "minute.num_get_data_threads.official", 4);
+            NUM_INSERT_THREADS_OFFICIAL = getPositiveIntProperty(properties, "minute.num_insert_threads.official", 2);
+            NUM_GET_DATA_THREADS_PROXY = getPositiveIntProperty(properties, "minute.num_get_data_threads.proxy", 12);
+            NUM_INSERT_THREADS_PROXY = getPositiveIntProperty(properties, "minute.num_insert_threads.proxy", 6);
 
             // 初始化动态线程池（使用官方 API 配置）
-            getDataPool = new DynamicThreadPool("MinuteJob-GetData", NUM_GET_DATA_THREADS_OFFICIAL);
-            insertPool = new DynamicThreadPool("MinuteJob-Insert", NUM_INSERT_THREADS_OFFICIAL);
+            getDataPool = new DynamicThreadPool(
+                    "MinuteJob-GetData",
+                    NUM_GET_DATA_THREADS_OFFICIAL,
+                    Math.max(NUM_GET_DATA_THREADS_OFFICIAL, NUM_GET_DATA_THREADS_PROXY)
+            );
+            insertPool = new DynamicThreadPool(
+                    "MinuteJob-Insert",
+                    NUM_INSERT_THREADS_OFFICIAL,
+                    Math.max(NUM_INSERT_THREADS_OFFICIAL, NUM_INSERT_THREADS_PROXY)
+            );
 
             // 注册 API 状态监听器
             BilibiliApi.addStateListener(new ApiStateListener() {
@@ -80,13 +84,31 @@ public class HantangMinuteJob {
         scheduler.scheduleWithFixedDelay(oThread, 0, 60, TimeUnit.SECONDS);
 
         // 提交 GetDataThread 任务
-        for (int i = 0; i < NUM_GET_DATA_THREADS_OFFICIAL; i++) {
-            getDataPool.submit(new GetDataThread(toGetDataQueue, toInsertQueue));
+        int maxGetDataThreads = Math.max(NUM_GET_DATA_THREADS_OFFICIAL, NUM_GET_DATA_THREADS_PROXY);
+        for (int i = 0; i < maxGetDataThreads; i++) {
+            getDataPool.submit(new GetDataThread(toGetDataQueue, toInsertQueue, getDataPool, i));
         }
 
         // 提交 InsertThread 任务
-        for (int i = 0; i < NUM_INSERT_THREADS_OFFICIAL; i++) {
-            insertPool.submit(new InsertThread(toInsertQueue));
+        int maxInsertThreads = Math.max(NUM_INSERT_THREADS_OFFICIAL, NUM_INSERT_THREADS_PROXY);
+        for (int i = 0; i < maxInsertThreads; i++) {
+            insertPool.submit(new InsertThread(toInsertQueue, insertPool, i));
+        }
+    }
+
+    private static int getPositiveIntProperty(Properties properties, String key, int defaultValue) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed > 0) {
+                return parsed;
+            }
+            throw new NumberFormatException("value must be positive");
+        } catch (NumberFormatException e) {
+            return defaultValue;
         }
     }
 

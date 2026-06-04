@@ -1,6 +1,7 @@
 package utils;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -12,7 +13,9 @@ public class DynamicThreadPool {
     private static final Logger logger = LogManager.getLogger(DynamicThreadPool.class);
 
     private final ThreadPoolExecutor executor;
+    private final AtomicInteger activeSize;
     private final String poolName;
+    private final int maxSize;
 
     /**
      * 创建动态线程池
@@ -20,14 +23,29 @@ public class DynamicThreadPool {
      * @param initialSize 初始线程数
      */
     public DynamicThreadPool(String poolName, int initialSize) {
+        this(poolName, initialSize, initialSize);
+    }
+
+    /**
+     * 创建动态线程池
+     * @param poolName 线程池名称（用于日志）
+     * @param initialSize 初始活跃线程数
+     * @param maxSize 最大线程数
+     */
+    public DynamicThreadPool(String poolName, int initialSize, int maxSize) {
+        if (initialSize <= 0 || maxSize <= 0 || initialSize > maxSize) {
+            throw new IllegalArgumentException("Invalid dynamic thread pool size");
+        }
         this.poolName = poolName;
+        this.maxSize = maxSize;
+        this.activeSize = new AtomicInteger(initialSize);
         this.executor = new ThreadPoolExecutor(
-            initialSize,                        // 核心线程数
-            initialSize,                        // 最大线程数
+            maxSize,                            // 核心线程数
+            maxSize,                            // 最大线程数
             60L, TimeUnit.SECONDS,              // 空闲线程存活时间
             new LinkedBlockingQueue<>()         // 无界队列
         );
-        logger.info("Created dynamic thread pool [{}] with size {}", poolName, initialSize);
+        logger.info("Created dynamic thread pool [{}] with active size {} and max size {}", poolName, initialSize, maxSize);
     }
 
     /**
@@ -35,17 +53,21 @@ public class DynamicThreadPool {
      * @param newSize 新的线程数
      */
     public void resize(int newSize) {
-        int currentSize = executor.getCorePoolSize();
+        if (newSize <= 0 || newSize > maxSize) {
+            throw new IllegalArgumentException("Invalid thread pool size: " + newSize);
+        }
+        int currentSize = activeSize.get();
+        activeSize.set(newSize);
         if (newSize == currentSize) {
             return; // 大小未变，无需调整
         }
 
         logger.info("Resizing thread pool [{}] from {} to {}", poolName, currentSize, newSize);
-
-        executor.setCorePoolSize(newSize);
-        executor.setMaximumPoolSize(newSize);
-
         logger.info("Thread pool [{}] resized successfully", poolName);
+    }
+
+    public boolean isWorkerActive(int workerIndex) {
+        return workerIndex < activeSize.get();
     }
 
     /**
