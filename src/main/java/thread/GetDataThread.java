@@ -5,6 +5,7 @@ import dos.VideoDynamicDO;
 import dos.VideoWithPriorityDO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import utils.DynamicThreadPool;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,10 +20,23 @@ public class GetDataThread extends Thread {
     private static final Logger logger = LogManager.getLogger(GetDataThread.class);
     final PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue;
     final ArrayBlockingQueue<VideoDynamicDO> toInsertQueue;
+    final DynamicThreadPool dynamicThreadPool;
+    final int workerIndex;
 
     public GetDataThread (PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue, ArrayBlockingQueue<VideoDynamicDO> toInsertQueue) {
+        this(toGetDataQueue, toInsertQueue, null, 0);
+    }
+
+    public GetDataThread(
+            PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue,
+            ArrayBlockingQueue<VideoDynamicDO> toInsertQueue,
+            DynamicThreadPool dynamicThreadPool,
+            int workerIndex
+    ) {
         this.toGetDataQueue = toGetDataQueue;
         this.toInsertQueue = toInsertQueue;
+        this.dynamicThreadPool = dynamicThreadPool;
+        this.workerIndex = workerIndex;
     }
 
     @Override
@@ -30,6 +44,10 @@ public class GetDataThread extends Thread {
         BilibiliApi bilibiliApi = new BilibiliApi();  // 任务处理类
         while (true) {
             try {
+                if (!isWorkerActive()) {
+                    Thread.sleep(1000);
+                    continue;
+                }
                 List<VideoWithPriorityDO> taskBatch = new ArrayList<>();
                 // 从队列中最多取40个任务（或队列中现有的所有任务）
                 synchronized (toGetDataQueue) {
@@ -56,5 +74,9 @@ public class GetDataThread extends Thread {
                 logger.error(e);
             }
         }
+    }
+
+    private boolean isWorkerActive() {
+        return dynamicThreadPool == null || dynamicThreadPool.isWorkerActive(workerIndex);
     }
 }
