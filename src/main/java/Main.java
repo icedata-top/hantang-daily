@@ -3,9 +3,7 @@ import business.HantangMinuteJob;
 import business.TodayDynamicDataJob;
 import business.TodayStaticDataJob;
 import dao.MysqlDao;
-import dos.VideoDynamicDO;
 import dos.VideoStaticDO;
-import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -82,14 +80,13 @@ public class Main {
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
-            todayDynamicDataJob.getData();
-            List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
-
-            // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
+            int failedInsertCount = todayDynamicDataJob.getDataAndInsert(mysqlDao);
 
             // (6) 分区信息
             mysqlDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            if (failedInsertCount > 0) {
+                logger.error("Some daily dynamic batches failed to insert. failedInsertCount: {}", failedInsertCount);
+            }
         } catch (SQLException e) {
             logger.error("SQLException (normalDynamicTask): {}", String.valueOf(e));
         } catch (Exception e) {
@@ -116,15 +113,14 @@ public class Main {
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
-            todayDynamicDataJob.getData();
-            List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
-
-            // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
+            int failedInsertCount = todayDynamicDataJob.getDataAndInsert(mysqlDao);
 
             // (6) 插入用户和分区信息
             mysqlDao.insertTypeDim(todayStaticDataJob.getTypeDOList());
             mysqlDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            if (failedInsertCount > 0) {
+                logger.error("Some daily dynamic batches failed to insert. failedInsertCount: {}", failedInsertCount);
+            }
         } catch (SQLException e) {
             logger.error("SQLException: {}", String.valueOf(e));
         } catch (IOException e) {
