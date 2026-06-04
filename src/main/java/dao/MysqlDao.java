@@ -108,6 +108,64 @@ public class MysqlDao {
     }
 
     /**
+     * 获取每日动态采集的视频AV号列表
+     *
+     * @return 每日动态采集的视频AV号列表
+     */
+    public List<Long> getDailyCollectionVideoIdList(boolean includeSundayOnly) throws SQLException {
+        List<Long> videoIdList = new ArrayList<>();
+        int count = getDailyCollectionVideoCount(includeSundayOnly);
+        int pageCount = (count + QUERY_SIZE - 1) / QUERY_SIZE;
+        String sql = "SELECT `aid` FROM video_collection_state " +
+                "WHERE (`priority` BETWEEN 1 AND 720 OR `priority` = 0 OR (? AND `priority` = -2)) " +
+                "ORDER BY CASE " +
+                "WHEN `priority` BETWEEN 1 AND 720 THEN 0 " +
+                "WHEN `priority` = 0 THEN 1 " +
+                "WHEN `priority` = -2 THEN 2 " +
+                "ELSE 3 END, `priority`, `aid` " +
+                "LIMIT ?, ?;";
+
+        for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+            int offset = pageIndex * QUERY_SIZE;
+
+            try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                preparedStatement.setBoolean(1, includeSundayOnly);
+                preparedStatement.setInt(2, offset);
+                preparedStatement.setInt(3, QUERY_SIZE);
+
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    while (resultSet.next()) {
+                        videoIdList.add(resultSet.getLong("aid"));
+                    }
+                }
+            }
+        }
+        return videoIdList;
+    }
+
+    /**
+     * 获取每日动态采集的视频数量
+     *
+     * @return 每日动态采集的视频数量
+     */
+    private int getDailyCollectionVideoCount(boolean includeSundayOnly) throws SQLException {
+        String sql = "SELECT COUNT(*) AS count FROM video_collection_state " +
+                "WHERE (`priority` BETWEEN 1 AND 720 OR `priority` = 0 OR (? AND `priority` = -2));";
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            preparedStatement.setBoolean(1, includeSundayOnly);
+
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                int count = 0;
+                if (resultSet.next()) {
+                    count = resultSet.getInt("count");
+                }
+                logger.info("Successfully query count of rows from video_collection_state for daily collection. count: {}", count);
+                return count;
+            }
+        }
+    }
+
+    /**
      * 获取当前正在观测的视频列表
      *
      * @param priority 优先度
