@@ -267,6 +267,13 @@ dynamic.group_size = 50
 db.url_local=jdbc:mysql://${your domain}:3306/hantang
 db.user_local=${your user account}
 db.password_local=${your user password}
+postgres.host=${your domain}
+postgres.port=5432
+postgres.database=hantang
+postgres.user=${your user account}
+postgres.password=${your user password}
+# optional, when video_collection_state is not on the default search_path
+postgres.schema=hantang_dynamic
 ```
 
 上述两个配置文件应当放置在运行Java程序的工作目录中。

@@ -1,6 +1,6 @@
 package thread;
 
-import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.VideoWithPriorityDO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -16,11 +16,11 @@ import java.util.concurrent.PriorityBlockingQueue;
 public class GetObservingVideoThread extends Thread {
     private static final Logger logger = LogManager.getLogger(GetObservingVideoThread.class);
     final PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue;
-    final MysqlDao mysqlDao; // 这里的dao对象是入参传进来的，因为GetVideoListThread不是多线程的，是单线程的。
+    final PostgresDao postgresDao; // 这里的dao对象是入参传进来的，因为GetVideoListThread不是多线程的，是单线程的。
 
-    public GetObservingVideoThread(PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue, MysqlDao mysqlDao) {
+    public GetObservingVideoThread(PriorityBlockingQueue<VideoWithPriorityDO> toGetDataQueue, PostgresDao postgresDao) {
         this.toGetDataQueue = toGetDataQueue;
-        this.mysqlDao = mysqlDao;
+        this.postgresDao = postgresDao;
     }
 
     @Override
@@ -28,7 +28,7 @@ public class GetObservingVideoThread extends Thread {
         LocalDateTime localDateTime = LocalDateTime.now();
         int minuteOfDay = localDateTime.getHour() * 60 + localDateTime.getMinute();
         try {
-            List<VideoWithPriorityDO> observingVideoList = mysqlDao.getDueMinuteCollectionVideoList(minuteOfDay);
+            List<VideoWithPriorityDO> observingVideoList = postgresDao.getDueMinuteCollectionVideoList(minuteOfDay);
             for (VideoWithPriorityDO videoWithPriorityDO : observingVideoList) {
                 if (videoWithPriorityDO == null) {
                     continue;

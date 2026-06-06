@@ -3,6 +3,7 @@ import business.HantangMinuteJob;
 import business.TodayDynamicDataJob;
 import business.TodayStaticDataJob;
 import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.VideoStaticDO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -75,8 +76,9 @@ public class Main {
     private static void normalDynamicTask() {
         try {
             MysqlDao mysqlDao = new MysqlDao();
+            PostgresDao postgresDao = new PostgresDao();
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
+            List<Long> allVideoIdList = postgresDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
@@ -107,9 +109,10 @@ public class Main {
             // (2) 视频静态信息落库
             MysqlDao mysqlDao = new MysqlDao();
             mysqlDao.insertStatic(videoStaticDOList);
+            PostgresDao postgresDao = new PostgresDao();
 
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
+            List<Long> allVideoIdList = postgresDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);

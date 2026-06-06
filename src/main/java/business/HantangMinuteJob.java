@@ -2,7 +2,7 @@ package business;
 
 import api.ApiStateListener;
 import api.BilibiliApi;
-import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.VideoDynamicDO;
 import dos.VideoWithPriorityDO;
 import thread.GetDataThread;
@@ -89,8 +89,8 @@ public class HantangMinuteJob {
 
 
     public static void main(String[] args) throws IOException, SQLException, ClassNotFoundException {
-        // 创建每分钟的任务，从视频静态信息表里读取，哪些视频在本分钟需要被监测，目前只支持优先度=1的
-        GetObservingVideoThread oThread = new GetObservingVideoThread(toGetDataQueue, new MysqlDao());
+        // 创建每分钟的任务，从采集中心表里读取当前分钟应该采集的视频。
+        GetObservingVideoThread oThread = new GetObservingVideoThread(toGetDataQueue, new PostgresDao());
         scheduler.scheduleWithFixedDelay(oThread, 0, 60, TimeUnit.SECONDS);
 
         // 提交 GetDataThread 任务
