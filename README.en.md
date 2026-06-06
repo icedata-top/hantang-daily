@@ -14,15 +14,17 @@ It utilizes the operating system's built-in scheduling feature to trigger the ex
 
 Using Bilibili search API, parameters are filled in to sort results in reverse chronological order, searching for keywords such as "Luo Tianyi" and "Chinese VOCALOID." The search stops when the submission time of the videos found exceeds the last search timestamp.
 
-The search results are first stored in memory, deduplicated, and then written into the MySQL video information table.
+The search results are first stored in memory, deduplicated, and then written into the PostgreSQL video information table.
 
 The data obtained in this manner is referred to as **static data**, such as the video submission time `pubdate`, the uploader's ID `mid`, title `title`, and so on.
 
 ### Comprehensive Data Retrieval (Dynamic Data)
 
-Traverse all videos (estimated to be around 300,000 in total), using multithreaded concurrent calls to the Bilibili API to obtain results. The results are stored in batches into the MySQL comprehensive information table.
+Traverse all videos (estimated to be around 300,000 in total), using multithreaded concurrent calls to the Bilibili API to obtain results. The results are stored in batches into PostgreSQL.
 
 This data is dynamic, including metrics such as views `view`, favorites `favorite`, etc., which are mostly of integer type. A large amount of data is written to the table daily.
+
+The collection list and minute collection cadence are read from PostgreSQL `video_collection_state`. Priority `1..720` means minute collection should run every N minutes, `0` means daily collection only, and `-2` means Sunday-only daily collection.
 
 ## Bilibili API
 
@@ -39,40 +41,26 @@ For detailed documentation, please refer to [WBI Signature](https://github.com/S
 
 ### Dimension Tables
 
-Dimension tables include partition information tables and user information tables.
+User information is written to PostgreSQL `discovered_users`. Partition data is stored directly in `video_static.type_id`. Vocal relationships are no longer written by this project.
 
-```mysql-sql
-CREATE TABLE IF NOT EXISTS dim_type (
-    type_id INT PRIMARY KEY COMMENT 'Partition ID',
-    name VARCHAR(255) NOT NULL COMMENT 'Partition Name'
-) COMMENT = 'Partition Dimension Table';
-
-CREATE TABLE IF NOT EXISTS dim_user (
-    user_id BIGINT PRIMARY KEY COMMENT 'User ID',
-    name VARCHAR(255) NOT NULL COMMENT 'Username',
-    face VARCHAR(255) COMMENT 'User Avatar URL'
-) COMMENT = 'User Dimension Table';
-```
 ### Fact Tables
 
 (1) Video Static Information
 
-```mysql-sql
+```sql
 CREATE TABLE IF NOT EXISTS video_static (
-    aid BIGINT PRIMARY KEY COMMENT '视频的 AV 号',
-    bvid VARCHAR(50) NOT NULL COMMENT '视频的 BV 号',
-    pubdate INT NOT NULL COMMENT '投稿时间',
-    title VARCHAR(255) NOT NULL COMMENT '标题',
-    description TEXT COMMENT '简介',
-    tag TEXT COMMENT '标签',
-    pic VARCHAR(255) COMMENT '封面 URL',
-    type_id INT COMMENT '分区 ID',
-    user_id BIGINT COMMENT 'UP主 ID',
-    KEY `idx_bvid` (bvid),
-    KEY `idx_user_id` (user_id)
-    -- FOREIGN KEY (type_id) REFERENCES type(id) ON DELETE SET NULL,
-    -- FOREIGN KEY (user_mid) REFERENCES user(mid) ON DELETE SET NULL
-) COMMENT = '视频静态信息';
+    aid         bigint       PRIMARY KEY,
+    bvid        varchar(50)  NOT NULL,
+    pubdate     timestamptz  NOT NULL,
+    title       varchar(255) NOT NULL,
+    description text,
+    tag         text,
+    pic         varchar(255),
+    type_id     integer,
+    user_id     bigint,
+    priority    integer,
+    updated_at  timestamptz  DEFAULT now()
+);
 ```
 
 The foreign keys here are commented out because strict foreign key checks are not needed; only logical foreign keys are required.
@@ -82,24 +70,34 @@ The foreign keys here are commented out because strict foreign key checks are no
 User ID is not stored here because it is static data. Once a video is uploaded, its uploader will not change.
 
 
-```mysql-sql
+```sql
 CREATE TABLE IF NOT EXISTS video_daily (
-    `record_date` DATE NOT NULL COMMENT '记录日期', 
-    `aid` BIGINT NOT NULL COMMENT '视频的 AV 号',
-    `bvid` VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',
-    `coin` INT NOT NULL COMMENT '硬币',
-    `favorite` INT NOT NULL COMMENT '收藏',
-    `danmaku` INT NOT NULL COMMENT '弹幕',
-    `view` INT NOT NULL COMMENT '播放',
-    `reply` INT NOT NULL COMMENT '评论',
-    `share` INT NOT NULL COMMENT '分享',
-    `like` INT NOT NULL COMMENT '点赞',
-    PRIMARY KEY (`record_date`, `aid`),
-    INDEX `idx_aid` (`aid`),
-    INDEX `idx_bvid` (`bvid`),
-    INDEX `idx_view` (`view`),
-    INDEX `idx_record_date` (`record_date`)
-) COMMENT = '视频动态数据';
+    record_date  date     NOT NULL,
+    aid          bigint   NOT NULL,
+    coin         integer,
+    favorite     integer,
+    danmaku      integer,
+    "view"       integer,
+    reply        integer,
+    share        integer,
+    "like"       integer
+);
+```
+
+(3) Video Minute Data
+
+```sql
+CREATE TABLE IF NOT EXISTS video_minute (
+    "time"    timestamptz  NOT NULL,
+    aid       bigint       NOT NULL,
+    coin      integer,
+    favorite  integer,
+    danmaku   integer,
+    "view"    integer,
+    reply     integer,
+    share     integer,
+    "like"    integer
+);
 ```
 
 ## Environment
@@ -114,13 +112,9 @@ OpenJDK Runtime Environment Corretto-21.0.4.7.1 (build 21.0.4+7-LTS)
 OpenJDK 64-Bit Server VM Corretto-21.0.4.7.1 (build 21.0.4+7-LTS, mixed mode, sharing)
 ```
 
-### MySQL
+### PostgreSQL
 
-This project uses MySQL 8.0, and the created database is named hantang. The MySQL details are as follows:
-
-```txt
-Ver 8.0.31 for Win64 on x86_64 (MySQL Community Server - GPL)
-```
+This project uses PostgreSQL. The table schema follows `hantang-dynamic`.
 
 ## Configuration
 
@@ -141,9 +135,13 @@ dynamic.group_size = 50
 The latter contains secret information such as the database connection account and password. The template is as follows:
 
 ```properties
-db.url_local=jdbc:mysql://${your domain}:3306/hantang
-db.user_local=${your user account}
-db.password_local=${your user password}
+postgres.host=${your domain}
+postgres.port=5432
+postgres.database=hantang
+postgres.user=${your user account}
+postgres.password=${your user password}
+# optional, when tables are not on the default search_path
+postgres.schema=hantang_dynamic
 ```
 
 The above two configuration files should be placed in the working directory where the Java program is run.
@@ -168,7 +166,7 @@ It is recommended to package all dependencies into the JAR, resulting in **one**
 
 ### Typical Startup
 
-(1) Ensure that the four data tables mentioned earlier are created in the MySQL database.
+(1) Ensure that the `hantang-dynamic` PostgreSQL schema has been initialized.
 
 (2) The typical file directory structure is as follows:
 

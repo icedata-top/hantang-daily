@@ -1,6 +1,6 @@
 package thread;
 
-import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.VideoDynamicDO;
 import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
@@ -34,7 +34,7 @@ public class InsertThread extends Thread {
     @Override
     public void run() {
         try {
-            MysqlDao mysqlDao = new MysqlDao();
+            PostgresDao postgresDao = new PostgresDao();
             while (true) {
                 if (!isWorkerActive()) {
                     Thread.sleep(1000);
@@ -51,8 +51,8 @@ public class InsertThread extends Thread {
                     continue;
                 }
 
-                logger.info("InsertThread thread ready to insert records to MySQL DB. size: {}", recordToInsert.size());
-                mysqlDao.insertDynamic(recordToInsert, DynamicInsertTableEnum.MINUTE);
+                logger.info("InsertThread thread ready to insert records to PostgreSQL DB. size: {}", recordToInsert.size());
+                postgresDao.insertDynamic(recordToInsert, DynamicInsertTableEnum.MINUTE);
             }
         } catch (SQLException | ClassNotFoundException | InterruptedException e) {
             logger.error(e);

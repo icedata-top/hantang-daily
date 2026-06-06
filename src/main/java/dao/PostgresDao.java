@@ -1,6 +1,10 @@
 package dao;
 
+import dos.UserDO;
+import dos.VideoDynamicDO;
+import dos.VideoStaticDO;
 import dos.VideoWithPriorityDO;
+import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -22,7 +26,12 @@ public class PostgresDao {
     private static final String DATABASE;
     private static final String SCHEMA;
     private static final String COLLECTION_STATE_TABLE;
+    private static final String VIDEO_STATIC_TABLE;
+    private static final String VIDEO_DAILY_TABLE;
+    private static final String VIDEO_MINUTE_TABLE;
+    private static final String DISCOVERED_USERS_TABLE;
     private static final int QUERY_SIZE = 10000;
+    private static final int INSERT_SIZE = 4000;
     private static final Logger logger = LogManager.getLogger(PostgresDao.class);
 
     static {
@@ -37,6 +46,10 @@ public class PostgresDao {
             PASSWORD = getRequiredProperty(properties, "postgres.password", "db.postgres.password");
             SCHEMA = getOptionalProperty(properties, "postgres.schema", "db.postgres.schema", "");
             COLLECTION_STATE_TABLE = getQualifiedTableName(SCHEMA, "video_collection_state");
+            VIDEO_STATIC_TABLE = getQualifiedTableName(SCHEMA, "video_static");
+            VIDEO_DAILY_TABLE = getQualifiedTableName(SCHEMA, "video_daily");
+            VIDEO_MINUTE_TABLE = getQualifiedTableName(SCHEMA, "video_minute");
+            DISCOVERED_USERS_TABLE = getQualifiedTableName(SCHEMA, "discovered_users");
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
@@ -50,6 +63,10 @@ public class PostgresDao {
 
         connection = DriverManager.getConnection(URL, USER, PASSWORD);
         logger.info("Successfully established connection to PostgreSQL via JDBC.");
+    }
+
+    public static int getInsertBatchSize() {
+        return INSERT_SIZE;
     }
 
     private static String getRequiredProperty(Properties properties, String key, String fallbackKey) {
@@ -196,6 +213,139 @@ public class PostgresDao {
                 }
                 return observingVideoList;
             }
+        }
+    }
+
+    public void insertStatic(List<VideoStaticDO> videoStaticDOList) throws SQLException {
+        String sql = "INSERT INTO " + VIDEO_STATIC_TABLE + " " +
+                "(aid, bvid, pubdate, title, description, tag, pic, type_id, user_id, updated_at) " +
+                "VALUES (?, ?, to_timestamp(?), ?, ?, ?, ?, ?, ?, now()) " +
+                "ON CONFLICT (aid) DO UPDATE SET " +
+                "bvid = EXCLUDED.bvid, " +
+                "pubdate = EXCLUDED.pubdate, " +
+                "title = EXCLUDED.title, " +
+                "description = EXCLUDED.description, " +
+                "tag = EXCLUDED.tag, " +
+                "pic = EXCLUDED.pic, " +
+                "type_id = EXCLUDED.type_id, " +
+                "user_id = EXCLUDED.user_id, " +
+                "updated_at = now();";
+
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (VideoStaticDO videoStaticDO : videoStaticDOList) {
+                preparedStatement.setLong(1, videoStaticDO.aid());
+                preparedStatement.setString(2, videoStaticDO.bvid());
+                preparedStatement.setInt(3, videoStaticDO.pubdate());
+                preparedStatement.setString(4, videoStaticDO.title());
+                preparedStatement.setString(5, videoStaticDO.description());
+                preparedStatement.setString(6, videoStaticDO.tag());
+                preparedStatement.setString(7, videoStaticDO.pic());
+                if (videoStaticDO.typeDO() == null) {
+                    preparedStatement.setNull(8, java.sql.Types.INTEGER);
+                } else {
+                    preparedStatement.setInt(8, videoStaticDO.typeDO().typeId());
+                }
+                if (videoStaticDO.userDO() == null) {
+                    preparedStatement.setNull(9, java.sql.Types.BIGINT);
+                } else {
+                    preparedStatement.setLong(9, videoStaticDO.userDO().mid());
+                }
+
+                preparedStatement.addBatch();
+                count++;
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into video_static. rows: {}", videoStaticDOList.size());
+        }
+    }
+
+    public void insertDailyDynamic(List<VideoDynamicDO> videoDynamicDOList, String recordDate) throws SQLException {
+        insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY, recordDate, (int) (System.currentTimeMillis() / 1000L));
+    }
+
+    public void insertDynamic(List<VideoDynamicDO> videoDynamicDOList, DynamicInsertTableEnum tableEnum) throws SQLException {
+        int now = (int) (System.currentTimeMillis() / 1000L);
+        insertDynamic(videoDynamicDOList, tableEnum, null, now);
+    }
+
+    private void insertDynamic(
+            List<VideoDynamicDO> videoDynamicDOList,
+            DynamicInsertTableEnum tableEnum,
+            String recordDate,
+            int recordTime
+    ) throws SQLException {
+        String sql;
+        if (DynamicInsertTableEnum.DAILY.equals(tableEnum)) {
+            sql = "INSERT INTO " + VIDEO_DAILY_TABLE + " " +
+                    "(record_date, aid, coin, favorite, danmaku, \"view\", reply, share, \"like\") " +
+                    "VALUES (?::date, ?, ?, ?, ?, ?, ?, ?, ?);";
+        } else {
+            sql = "INSERT INTO " + VIDEO_MINUTE_TABLE + " " +
+                    "(\"time\", aid, coin, favorite, danmaku, \"view\", reply, share, \"like\") " +
+                    "VALUES (to_timestamp(?), ?, ?, ?, ?, ?, ?, ?, ?);";
+        }
+
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (VideoDynamicDO video : videoDynamicDOList) {
+                if (DynamicInsertTableEnum.DAILY.equals(tableEnum)) {
+                    preparedStatement.setString(1, recordDate);
+                } else {
+                    preparedStatement.setInt(1, recordTime);
+                }
+                preparedStatement.setLong(2, video.aid());
+                preparedStatement.setInt(3, video.coin());
+                preparedStatement.setInt(4, video.favorite());
+                preparedStatement.setInt(5, video.danmaku());
+                preparedStatement.setInt(6, video.view());
+                preparedStatement.setInt(7, video.reply());
+                preparedStatement.setInt(8, video.share());
+                preparedStatement.setInt(9, video.like());
+
+                preparedStatement.addBatch();
+                count++;
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into {}. rows: {}", tableEnum.getTable(), videoDynamicDOList.size());
+        }
+    }
+
+    public void insertUserDim(List<UserDO> userDOList) throws SQLException {
+        String sql = "INSERT INTO " + DISCOVERED_USERS_TABLE + " (user_id, user_name, face, last_updated) " +
+                "VALUES (?, ?, ?, now()) " +
+                "ON CONFLICT (user_id) DO UPDATE SET " +
+                "user_name = EXCLUDED.user_name, " +
+                "face = EXCLUDED.face, " +
+                "last_updated = now();";
+
+        try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            int count = 0;
+
+            for (UserDO user : userDOList) {
+                preparedStatement.setLong(1, user.mid());
+                preparedStatement.setString(2, user.name());
+                preparedStatement.setString(3, user.face());
+
+                preparedStatement.addBatch();
+                count++;
+                if (count % INSERT_SIZE == 0) {
+                    preparedStatement.executeBatch();
+                }
+            }
+
+            preparedStatement.executeBatch();
+            logger.info("Successfully insert into discovered_users. rows: {}", userDOList.size());
         }
     }
 }

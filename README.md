@@ -24,13 +24,13 @@
 
 通过Bilibili的搜索API，填写参数使其按时间倒序排序，对诸如“洛天依”“中文VOCALOID”关键词进行搜索。搜索到的视频投稿时间超过上次搜索的时间点就截止。
 
-搜索结果先保存在内存中，进行去重后写入MySQL视频信息表。
+搜索结果先保存在内存中，进行去重后写入 PostgreSQL 视频信息表。
 
 如此获得到的数据称为**静态数据**，例如视频的投稿时间`pubdate`、UP主`mid`、标题`title`等信息。
 
 ### 全量获取数据（动态数据）
 
-遍历全量视频（预测在30万数量级），多线程并发调用Bilibili API，得到结果。分批次落入MySQL全量信息表中。
+遍历全量视频（预测在30万数量级），多线程并发调用Bilibili API，得到结果。分批次落入 PostgreSQL 全量信息表中。
 
 这里的数据是动态数据，例如播放量`view`、收藏量`favorite`等，基本都是整数类型的。每日都有大量数据落表。
 
@@ -40,9 +40,9 @@
 
 寒棠 Minute 根据视频的优先度，进行分层级获取数据。优先度最高的被监测视频，将会每 1 分钟记录一条数据。
 所谓优先度，就是记录的时间间隔（周期），优先度为 $p$ 的视频，将会每 $p$ 分钟记录一条数据。
-故而优先度 1 是最高优先度。优先度将会在视频静态信息表中，由字段`priority`给出。
+故而优先度 1 是最高优先度。优先度由 PostgreSQL 的 `video_collection_state.priority` 给出。
 
-优先度仅为 1、15、60 三个数值，为 null 的视为最低优先度。
+优先度 `1..720` 表示分钟任务每隔多少分钟采集一次，`0` 表示仅每日任务采集，`-2` 表示仅每周日的每日任务采集。
 
 ### 优先度变更
 
@@ -83,54 +83,26 @@
 
 ### 维度表
 
-由数据源产生的维度表包含**分区信息表**和**用户信息表**。
-
-```mysql-sql
-CREATE TABLE IF NOT EXISTS dim_type (
-    type_id INT PRIMARY KEY COMMENT '分区 ID',
-    name VARCHAR(255) NOT NULL COMMENT '分区名称'
-) COMMENT = '分区_维度表';
-
-CREATE TABLE IF NOT EXISTS dim_user (
-    user_id BIGINT PRIMARY KEY COMMENT '用户 ID',
-    name VARCHAR(255) NOT NULL COMMENT '用户名',
-    face VARCHAR(255) COMMENT '用户头像 URL'
-) COMMENT = '用户_维度表';
-```
-
-另手动创建虚拟歌手维度表，该表仅手动维护。
-```mysql-sql
-CREATE TABLE IF NOT EXISTS dim_vocal (
-    vocal_id INT PRIMARY KEY COMMENT '虚拟歌手 ID',
-    `name` VARCHAR(255) NOT NULL COMMENT '虚拟歌手名称',
-    `group` VARCHAR(255) NOT NULL COMMENT '虚拟歌手组团'
-) COMMENT = '虚拟歌手_维度表';
-```
+用户信息写入 PostgreSQL 的 `discovered_users`。分区信息直接保存在 `video_static.type_id` 中。虚拟歌手关系不再由本项目写入。
 
 ### 事实表
 
 (1) 视频静态信息 
 
-```mysql-sql
+```sql
 CREATE TABLE IF NOT EXISTS video_static (
-    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
-    `bvid` varchar(50) NOT NULL COMMENT '视频的 BV 号',
-    `pubdate` int NOT NULL COMMENT '投稿时间',
-    `title` varchar(255) NOT NULL COMMENT '标题',
-    `description` text COMMENT '简介',
-    `tag` text COMMENT '标签',
-    `pic` varchar(255) DEFAULT NULL COMMENT '封面 URL',
-    `type_id` int DEFAULT NULL COMMENT '分区 ID',
-    `user_id` bigint DEFAULT NULL COMMENT 'UP主 ID',
-    `priority` int DEFAULT NULL COMMENT '优先级，获取数据的时间间隔（单位：分钟）',
-    PRIMARY KEY (`aid`),
-    KEY `idx_bvid` (bvid),
-    KEY `idx_user_id` (user_id),
-    KEY `idx_priority` (`priority`),
-    KEY `idx_pubdate` (`pubdate`)
-    -- FOREIGN KEY (type_id) REFERENCES type(id) ON DELETE SET NULL,
-    -- FOREIGN KEY (user_mid) REFERENCES user(mid) ON DELETE SET NULL
-) COMMENT = '视频静态信息';
+    aid         bigint       PRIMARY KEY,
+    bvid        varchar(50)  NOT NULL,
+    pubdate     timestamptz  NOT NULL,
+    title       varchar(255) NOT NULL,
+    description text,
+    tag         text,
+    pic         varchar(255),
+    type_id     integer,
+    user_id     bigint,
+    priority    integer,
+    updated_at  timestamptz  DEFAULT now()
+);
 ```
 
 这里的外键被注释掉，因为并不需要事实上的外键，只需要逻辑上的外键。我们不对外键进行严格检查。
@@ -141,24 +113,18 @@ CREATE TABLE IF NOT EXISTS video_static (
 
 该表由寒棠 Daily 每天写入。
 
-```mysql-sql
+```sql
 CREATE TABLE IF NOT EXISTS video_daily (
-    `record_date` DATE NOT NULL COMMENT '记录日期', 
-    `aid` BIGINT NOT NULL COMMENT '视频的 AV 号',
-    `bvid` VARCHAR(255) NOT NULL COMMENT '视频的 BV 号',
-    `coin` INT NOT NULL COMMENT '硬币',
-    `favorite` INT NOT NULL COMMENT '收藏',
-    `danmaku` INT NOT NULL COMMENT '弹幕',
-    `view` INT NOT NULL COMMENT '播放',
-    `reply` INT NOT NULL COMMENT '评论',
-    `share` INT NOT NULL COMMENT '分享',
-    `like` INT NOT NULL COMMENT '点赞',
-    PRIMARY KEY (`record_date`, `aid`),
-    INDEX `idx_aid` (`aid`),
-    INDEX `idx_bvid` (`bvid`),
-    INDEX `idx_view` (`view`),
-    INDEX `idx_record_date` (`record_date`)
-) COMMENT = '视频动态数据';
+    record_date  date     NOT NULL,
+    aid          bigint   NOT NULL,
+    coin         integer,
+    favorite     integer,
+    danmaku      integer,
+    "view"       integer,
+    reply        integer,
+    share        integer,
+    "like"       integer
+);
 ```
 
 (3) 视频分钟数据
@@ -169,61 +135,18 @@ CREATE TABLE IF NOT EXISTS video_daily (
 
 这个表设计的索引 `idx_aid_view` (`aid`, `view`) 是为了更快地查询给定视频在何时达成殿堂/传说的。
 
-```mysql-sql
-CREATE TABLE `video_minute` (
-    `time` int NOT NULL COMMENT '记录时间戳',
-    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
-    `bvid` varchar(255) NOT NULL COMMENT '视频的 BV 号',
-    `coin` int NOT NULL COMMENT '硬币',
-    `favorite` int NOT NULL COMMENT '收藏',
-    `danmaku` int NOT NULL COMMENT '弹幕',
-    `view` int NOT NULL COMMENT '播放',
-    `reply` int NOT NULL COMMENT '评论',
-    `share` int NOT NULL COMMENT '分享',
-    `like` int NOT NULL COMMENT '点赞',
-    PRIMARY KEY (`time`, `aid`),
-    KEY `idx_aid` (`aid`),
-    KEY `idx_bvid` (`bvid`),
-    KEY `idx_aid_view` (`aid`, `view`)
-) COMMENT = '视频逐分钟数据';
-```
-
-
-### OLAP表
-
-以上的维度表和事实表为底表，但是每次查询时，并不是总是得经由底表，这样会导致查询缓慢。因此，需要适当地对数据进行聚合，得到OLAP表（相当于二级结论）。
-
-(1) 歌曲与虚拟歌手的关系表
-
-多对多映射关系，因为1位虚拟歌手（如洛天依）可以唱多首歌，并且1首歌（如《普通DISCO》）可以被多位虚拟歌手演唱。
-
-利用此表，可以查询某个歌手/组团有哪些作品。
-
-```mysql-sql
-CREATE TABLE `hantang`.`olap_rel_video_vocal` (
-    `aid` bigint NOT NULL COMMENT '视频的 AV 号',
-    `vocal_id` int NOT NULL COMMENT '虚拟歌手 ID',
-    PRIMARY KEY (`aid`, `vocal_id`),
-    KEY `idx_vocal_id` (`vocal_id`)
-) COMMENT = '歌曲与虚拟歌手的关系';
-```
-
-(2) 三个维度的每日汇总信息
-
-三个维度指的是：虚拟歌手、组团、总计。
-这里的汇总信息并不是“当天”的，而是“截止当天”的。所以要算出当天的数据，需要再次进行差分。
-
-例如，使用筛选条件`WHERE d = '2024-10-11' AND cube_id = 1 AND dimens = '洛天依'`，查询到的投稿数指从有记录以来截止2024年10月11日的洛天依的投稿数，并非2024年10月11日当天洛天依的投稿数。
-
-```mysql-sql
-CREATE TABLE IF NOT EXISTS olap_aggre (
-    `d` DATE NOT NULL COMMENT '日期',
-    `cube_id` INT NOT NULL COMMENT '立方体 ID 1虚拟歌手 2组团 3总计',
-    `dimens` VARCHAR(255) NOT NULL COMMENT '维度',
-    `cnt` INT NOT NULL COMMENT '累计投稿数',
-    `view` BIGINT NOT NULL COMMENT '累计播放',
-    `favorite` BIGINT NOT NULL COMMENT '累计收藏'
-) COMMENT = '每日汇总信息';
+```sql
+CREATE TABLE IF NOT EXISTS video_minute (
+    "time"    timestamptz  NOT NULL,
+    aid       bigint       NOT NULL,
+    coin      integer,
+    favorite  integer,
+    danmaku   integer,
+    "view"    integer,
+    reply     integer,
+    share     integer,
+    "like"    integer
+);
 ```
 
 
@@ -239,12 +162,9 @@ OpenJDK Runtime Environment Corretto-21.0.4.7.1 (build 21.0.4+7-LTS)
 OpenJDK 64-Bit Server VM Corretto-21.0.4.7.1 (build 21.0.4+7-LTS, mixed mode, sharing)
 ```
 
-### MySQL
+### PostgreSQL
 
-本项目使用MySQL 8.0，创建的数据库名为`hantang`。MySQL具体如下
-```txt
-Ver 8.0.31 for Win64 on x86_64 (MySQL Community Server - GPL)
-```
+本项目使用 PostgreSQL，表结构以 `hantang-dynamic` 的 schema 为准。
 
 ## 配置
 
@@ -264,9 +184,6 @@ dynamic.group_size = 50
 
 后者则是秘密信息，如数据库连接的账号、密码等。模板如下：
 ```properties
-db.url_local=jdbc:mysql://${your domain}:3306/hantang
-db.user_local=${your user account}
-db.password_local=${your user password}
 postgres.host=${your domain}
 postgres.port=5432
 postgres.database=hantang
@@ -301,7 +218,7 @@ postgres.schema=hantang_dynamic
 
 ### 典型启动
 
-(1) 确保在MySQL数据库中创建好了前文所说的四张数据表。
+(1) 确保 PostgreSQL 中已初始化 `hantang-dynamic` 的表结构。
 
 (2) 典型的文件目录如下：
 

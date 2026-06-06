@@ -1,7 +1,7 @@
 package business;
 
 import api.BilibiliApi;
-import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.UserDO;
 import dos.VideoDynamicDO;
 import org.apache.logging.log4j.LogManager;
@@ -139,7 +139,7 @@ public class TodayDynamicDataJob {
     /**
      * 并发地调用API获取结果，并在每个批次完成后立即写入每日动态表。
      */
-    public int getDataAndInsert(MysqlDao mysqlDao) throws IOException {
+    public int getDataAndInsert(PostgresDao postgresDao) throws IOException {
         BilibiliApi bilibiliApi = new BilibiliApi();
         // 这个任务的线程池不能在运行中扩容，使用两种配置中的较大值。
         int executorsSize = Math.max(EXECUTORS_SIZE_PROXY, EXECUTORS_SIZE_OFFICIAL);
@@ -148,7 +148,7 @@ public class TodayDynamicDataJob {
         int groupCount = (allVideoIdList.size() + GROUP_SIZE - 1) / GROUP_SIZE;
         int submittedCount = 0;
         int failedInsertCount = 0;
-        int insertBatchSize = MysqlDao.getInsertBatchSize();
+        int insertBatchSize = PostgresDao.getInsertBatchSize();
         List<VideoDynamicDO> pendingInsertList = new ArrayList<>(insertBatchSize);
         String recordDate = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
 
@@ -170,7 +170,7 @@ public class TodayDynamicDataJob {
                     allVideoDynamicDOList.addAll(videoDynamicDOList);
                     pendingInsertList.addAll(videoDynamicDOList);
                     failedInsertCount += flushReadyDailyDynamicBatches(
-                            mysqlDao,
+                            postgresDao,
                             pendingInsertList,
                             recordDate,
                             insertBatchSize
@@ -183,7 +183,7 @@ public class TodayDynamicDataJob {
                     logger.error("Error occurred while fetching video info.", e);
                 }
             }
-            failedInsertCount += flushDailyDynamicBatch(mysqlDao, pendingInsertList, recordDate);
+            failedInsertCount += flushDailyDynamicBatch(postgresDao, pendingInsertList, recordDate);
 
             logger.info("Successfully finish all processes for getting and inserting dynamic data. Count of processes: {}", submittedCount);
             return failedInsertCount;
@@ -193,7 +193,7 @@ public class TodayDynamicDataJob {
     }
 
     private int flushReadyDailyDynamicBatches(
-            MysqlDao mysqlDao,
+            PostgresDao postgresDao,
             List<VideoDynamicDO> pendingInsertList,
             String recordDate,
             int insertBatchSize
@@ -202,13 +202,13 @@ public class TodayDynamicDataJob {
         while (pendingInsertList.size() >= insertBatchSize) {
             List<VideoDynamicDO> batch = new ArrayList<>(pendingInsertList.subList(0, insertBatchSize));
             pendingInsertList.subList(0, insertBatchSize).clear();
-            failedInsertCount += flushDailyDynamicBatch(mysqlDao, batch, recordDate);
+            failedInsertCount += flushDailyDynamicBatch(postgresDao, batch, recordDate);
         }
         return failedInsertCount;
     }
 
     private int flushDailyDynamicBatch(
-            MysqlDao mysqlDao,
+            PostgresDao postgresDao,
             List<VideoDynamicDO> videoDynamicDOList,
             String recordDate
     ) {
@@ -216,7 +216,7 @@ public class TodayDynamicDataJob {
             return 0;
         }
         try {
-            mysqlDao.insertDailyDynamic(videoDynamicDOList, recordDate);
+            postgresDao.insertDailyDynamic(videoDynamicDOList, recordDate);
             videoDynamicDOList.clear();
             return 0;
         } catch (SQLException e) {
