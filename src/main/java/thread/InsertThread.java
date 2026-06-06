@@ -1,10 +1,11 @@
 package thread;
 
-import dao.MysqlDao;
+import dao.PostgresDao;
 import dos.VideoDynamicDO;
 import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import utils.DynamicThreadPool;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -17,16 +18,28 @@ import java.util.concurrent.ArrayBlockingQueue;
 public class InsertThread extends Thread {
     private static final Logger logger = LogManager.getLogger(InsertThread.class);
     final ArrayBlockingQueue<VideoDynamicDO> toInsertQueue;
+    final DynamicThreadPool dynamicThreadPool;
+    final int workerIndex;
 
     public InsertThread(ArrayBlockingQueue<VideoDynamicDO> toInsertQueue) {
+        this(toInsertQueue, null, 0);
+    }
+
+    public InsertThread(ArrayBlockingQueue<VideoDynamicDO> toInsertQueue, DynamicThreadPool dynamicThreadPool, int workerIndex) {
         this.toInsertQueue = toInsertQueue;
+        this.dynamicThreadPool = dynamicThreadPool;
+        this.workerIndex = workerIndex;
     }
 
     @Override
     public void run() {
         try {
-            MysqlDao mysqlDao = new MysqlDao();
+            PostgresDao postgresDao = new PostgresDao();
             while (true) {
+                if (!isWorkerActive()) {
+                    Thread.sleep(1000);
+                    continue;
+                }
                 List<VideoDynamicDO> recordToInsert = new ArrayList<>();
                 synchronized (toInsertQueue) {
                     toInsertQueue.drainTo(recordToInsert, 100);
@@ -38,11 +51,15 @@ public class InsertThread extends Thread {
                     continue;
                 }
 
-                logger.info("InsertThread thread ready to insert records to MySQL DB. size: {}", recordToInsert.size());
-                mysqlDao.insertDynamic(recordToInsert, DynamicInsertTableEnum.MINUTE);
+                logger.info("InsertThread thread ready to insert records to PostgreSQL DB. size: {}", recordToInsert.size());
+                postgresDao.insertDynamic(recordToInsert, DynamicInsertTableEnum.MINUTE);
             }
         } catch (SQLException | ClassNotFoundException | InterruptedException e) {
             logger.error(e);
         }
+    }
+
+    private boolean isWorkerActive() {
+        return dynamicThreadPool == null || dynamicThreadPool.isWorkerActive(workerIndex);
     }
 }

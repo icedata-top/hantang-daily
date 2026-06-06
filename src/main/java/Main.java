@@ -1,16 +1,15 @@
-import business.AnalyzeVocalJob;
 import business.HantangMinuteJob;
 import business.TodayDynamicDataJob;
 import business.TodayStaticDataJob;
-import dao.MysqlDao;
-import dos.VideoDynamicDO;
+import dao.PostgresDao;
 import dos.VideoStaticDO;
-import enums.DynamicInsertTableEnum;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.List;
 
 public class Main {
@@ -35,13 +34,6 @@ public class Main {
             } catch (SQLException | IOException | ClassNotFoundException e) {
                 logger.error("Error happened when execute Hantang Minute Job. exception: .", e);
             }
-        } else if ("olap_vocal".equalsIgnoreCase(command)) {
-            try {
-                AnalyzeVocalJob analyzeVocalJob = new AnalyzeVocalJob();
-                analyzeVocalJob.run();
-            } catch (SQLException | ClassNotFoundException e) {
-                logger.error("Error happened when execute analyze vocal Job. exception: .", e);
-            }
         }
         long deltaTime = System.currentTimeMillis() - startTime;
         logger.info("Successfully FINISH main process. Time: {} ms. command: {}", deltaTime, command);
@@ -58,10 +50,8 @@ public class Main {
             List<VideoStaticDO> videoStaticDOList = todayStaticDataJob.getAllVideoStaticDOList();
 
             // (2) 视频静态信息落库
-            MysqlDao mysqlDao = new MysqlDao();
-            mysqlDao.insertStatic(videoStaticDOList);
-
-            mysqlDao.insertTypeDim(todayStaticDataJob.getTypeDOList());
+            PostgresDao postgresDao = new PostgresDao();
+            postgresDao.insertStatic(videoStaticDOList);
         } catch (SQLException e) {
             logger.error("SQLException (normalStaticTasks): {}", String.valueOf(e));
         } catch (Exception e) {
@@ -74,20 +64,19 @@ public class Main {
      */
     private static void normalDynamicTask() {
         try {
-            MysqlDao mysqlDao = new MysqlDao();
+            PostgresDao postgresDao = new PostgresDao();
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getAllVideoIdList();
+            List<Long> allVideoIdList = postgresDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
-            todayDynamicDataJob.getData();
-            List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
-
-            // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
+            int failedInsertCount = todayDynamicDataJob.getDataAndInsert(postgresDao);
 
             // (6) 分区信息
-            mysqlDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            postgresDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            if (failedInsertCount > 0) {
+                logger.error("Some daily dynamic batches failed to insert. failedInsertCount: {}", failedInsertCount);
+            }
         } catch (SQLException e) {
             logger.error("SQLException (normalDynamicTask): {}", String.valueOf(e));
         } catch (Exception e) {
@@ -106,23 +95,21 @@ public class Main {
             List<VideoStaticDO> videoStaticDOList = todayStaticDataJob.getAllVideoStaticDOList();
 
             // (2) 视频静态信息落库
-            MysqlDao mysqlDao = new MysqlDao();
-            mysqlDao.insertStatic(videoStaticDOList);
+            PostgresDao postgresDao = new PostgresDao();
+            postgresDao.insertStatic(videoStaticDOList);
 
             // (3) 取出视频列表
-            List<Long> allVideoIdList = mysqlDao.getAllVideoIdList();
+            List<Long> allVideoIdList = postgresDao.getDailyCollectionVideoIdList(shouldIncludeSundayOnlyDailyCollection());
 
             // (4) 全量获取动态数据
             TodayDynamicDataJob todayDynamicDataJob = new TodayDynamicDataJob(allVideoIdList);
-            todayDynamicDataJob.getData();
-            List<VideoDynamicDO> videoDynamicDOList = todayDynamicDataJob.getAllVideoDynamicDOList();
-
-            // (5) 全量插入动态数据
-            mysqlDao.insertDynamic(videoDynamicDOList, DynamicInsertTableEnum.DAILY);
+            int failedInsertCount = todayDynamicDataJob.getDataAndInsert(postgresDao);
 
             // (6) 插入用户和分区信息
-            mysqlDao.insertTypeDim(todayStaticDataJob.getTypeDOList());
-            mysqlDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            postgresDao.insertUserDim(todayDynamicDataJob.getUserDOList());
+            if (failedInsertCount > 0) {
+                logger.error("Some daily dynamic batches failed to insert. failedInsertCount: {}", failedInsertCount);
+            }
         } catch (SQLException e) {
             logger.error("SQLException: {}", String.valueOf(e));
         } catch (IOException e) {
@@ -132,5 +119,9 @@ public class Main {
         } catch (Exception e) {
             logger.error(e);
         }
+    }
+
+    private static boolean shouldIncludeSundayOnlyDailyCollection() {
+        return LocalDate.now().getDayOfWeek() == DayOfWeek.SUNDAY;
     }
 }

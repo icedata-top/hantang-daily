@@ -1,7 +1,6 @@
 package business;
 
 import api.BilibiliApi;
-import dos.TypeDO;
 import dos.VideoStaticDO;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -86,10 +85,4 @@ public class TodayStaticDataJob {
         return allVideoStaticDOList;
     }
 
-    /**
-     * 静态信息里面包含了分区信息，从这里提取，以便插入到分区的维度表。
-     */
-    public List<TypeDO> getTypeDOList() {
-        return allVideoStaticDOList.stream().map(VideoStaticDO::typeDO).distinct().toList();
-    }
 }

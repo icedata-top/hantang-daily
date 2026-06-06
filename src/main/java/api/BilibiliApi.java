@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -25,17 +27,55 @@ public class BilibiliApi {
     private static final String PROXY_BASE_URL;
     private static final String OFFICIAL_BASE_URL = "https://api.bilibili.com";
     private static final long COOL_DOWN_PERIOD = 15 * 60 * 1000; // 15分钟
-    private volatile long bilibiliCoolDownUntil = 0; // 原子性访问
+    private static final AtomicLong bilibiliCoolDownUntil = new AtomicLong(0);
+    private static final Object apiStateLock = new Object();
+    private static boolean usingProxy = false;
+    private static final List<ApiStateListener> listeners = new CopyOnWriteArrayList<>();
 
     static {
         try {
             Properties properties = new Properties();
             FileInputStream input = new FileInputStream("config.secret.properties");
             properties.load(input);
-            PROXY_BASE_URL = properties.getProperty("proxy.base_url");
+            PROXY_BASE_URL = StringUtils.trimToNull(properties.getProperty("proxy.base_url"));
         } catch (IOException e) {
             e.fillInStackTrace();
             throw new RuntimeException("无法加载数据库配置文件", e);
+        }
+    }
+
+    /**
+     * 注册 API 状态监听器
+     */
+    public static void addStateListener(ApiStateListener listener) {
+        listeners.add(listener);
+    }
+
+    /**
+     * 获取当前是否正在使用代理 API
+     */
+    public boolean isUsingProxy() {
+        synchronized (apiStateLock) {
+            return usingProxy;
+        }
+    }
+
+    /**
+     * 通知所有监听器 API 状态已改变
+     */
+    private static void updateApiState(boolean useProxy) {
+        synchronized (apiStateLock) {
+            if (usingProxy != useProxy) {
+                usingProxy = useProxy;
+                logger.info("API state changed to: {}", useProxy ? "Proxy" : "Official");
+                for (ApiStateListener listener : listeners) {
+                    try {
+                        listener.onApiStateChanged(useProxy);
+                    } catch (Exception e) {
+                        logger.error("Error notifying listener", e);
+                    }
+                }
+            }
         }
     }
 
@@ -52,7 +92,7 @@ public class BilibiliApi {
         IOException lastException = null;
 
         // 检查是否在冷却期内
-        boolean inCoolDown = System.currentTimeMillis() < bilibiliCoolDownUntil;
+        boolean inCoolDown = System.currentTimeMillis() < bilibiliCoolDownUntil.get();
 
         // 优先尝试官方域名（如果不在冷却期）
         if (!inCoolDown) {
@@ -60,6 +100,7 @@ public class BilibiliApi {
                 String officialUrl = combineUrl(OFFICIAL_BASE_URL, apiPath);
                 result = HttpUtils.callApiWithRetry(officialUrl, 1, 2000);
                 if (StringUtils.isNotEmpty(result)) {
+                    updateApiState(false); // 官方请求成功后再切回官方状态
                     logSuccess("Bilibili Official", startTime, officialUrl);
                     return result;
                 } else {
@@ -68,15 +109,19 @@ public class BilibiliApi {
             } catch (IOException e) {
                 lastException = e;
                 logger.warn("Official API request failed, activating 15-minute cooldown. Path: {}", apiPath, e);
-                bilibiliCoolDownUntil = System.currentTimeMillis() + COOL_DOWN_PERIOD; // 开启冷却
+                bilibiliCoolDownUntil.set(System.currentTimeMillis() + COOL_DOWN_PERIOD); // 开启冷却
             }
         }
 
         // 降级到代理域名（重试3次）
+        if (StringUtils.isBlank(PROXY_BASE_URL)) {
+            throw new IOException("Official API request failed and proxy.base_url is not configured", lastException);
+        }
         try {
             String proxyUrl = combineUrl(PROXY_BASE_URL, apiPath);
             result = HttpUtils.callApiWithRetry(proxyUrl, 3, 2000);
             if (StringUtils.isNotEmpty(result)) {
+                updateApiState(true); // 代理请求成功后再切到代理状态
                 logSuccess("Proxy", startTime, proxyUrl);
                 return result;
             }
